@@ -15,8 +15,59 @@ import time
 import psutil
 import signal
 import ipget
+import smbus2
+
 
 SAST_MONITOR = "SAST_monitor.py"
+
+I2C_BUS = 1
+I2C_PiSugar = 0x68
+I2C_PiSugar_REG = 0x57
+
+def _existI2Cevice(address):
+    """ I2Cデバイスが存在するか？"""
+    try:
+        bus = smbus2.SMBus(I2C_BUS)
+        bus.read_byte(address)
+        C.logger.debug(f"デバイス {hex(address)} が検出されました")
+        ret = True
+    except OSError as e:
+        C.logger.debug(f"デバイス {hex(address)} は検出されませんでした{e}")
+        ret = False
+    finally:
+        bus.close()
+    return ret
+
+def getBatteryPiSugar3() :
+    """ PiSugar3 のI2Cレジスタ(0x57）からバッテリー容量を返す
+        I2Cが無い場合やアクセス不可の場合は-1を返す
+    """
+    level = -1
+    try:
+        bus = smbus2.SMBus(I2C_BUS)
+        level= bus.read_byte_data(I2C_PiSugar_REG, 0x2a)
+
+    except Exception as e:
+        C.logger.warning(f"No DATA from {I2C_PiSugar_REG} addr.")
+    
+    finally:
+        bus.close()
+        return level
+
+'''
+def getBatteryPiSugar() :
+    """ PiDugar3のパッテリー容量を検出"""
+    if _existI2Cevice(I2C_PiSugar) : 
+        import pisugar as PS
+        try :
+            conn, event_conn = PS.connect_tcp('raspberrypi.local')
+            s = PS.PiSugarServer(conn, event_conn)
+            return s.get_battery_level()
+        except Exception as e :
+            return -1
+    else :
+        return -1
+'''
 
 def isRootUser() :
     """プロセス起動ユーザがroot?
@@ -268,6 +319,9 @@ if __name__ == '__main__':
     print(f"Volt   : {getMachine_Volt()}")
     print(f"Serial : {getSerial()}")
     print(f"CPU%   : {getCPU()}")
+
+    print(f"PiSugar: {_existI2Cevice(I2C_PiSugar)}")
+    print(f"PiSugar3 Battery Level : {getBatteryPiSugar3()}")
     
 
     print(f"IsRoot : {isRootUser()}")

@@ -60,7 +60,7 @@ sudo raspi-config
 sudo apt install -y sqlite3 git python3-dev python3-pip vim 
 sudo pip3 install Adafruit_SSD1306 Pillow ipget pyserial schedule
 sudo pip3 install git+https://github.com/AmbientDataInc/ambient-python-lib.git 
-sudo pip3 install wiringpi psutil schedule ipget bluepy 
+sudo pip3 install wiringpi psutil schedule ipget bluepy smbus2
 
 
 3. add user Permissions
@@ -104,8 +104,5 @@ sudo hwclock -w --verbose
 7. SQLIte3 Library Initialize
 cd $SAST_DIR; ./libSQLite.py CLEAR -> YES
 
-
-
-
-<<EOS
+EOS
 echo "done."

@@ -344,10 +344,10 @@ def _send_cloud() :
         ## Notify List が存在するか？ 無ければ通知はSKIP 
         if not len(notifyList4Node) == 0 :
             mess = ""
-            amb_conf = S.getAmbientInfo( no )
-            amb_url = f"{C.AMB['URL']}{amb_conf['id']}"
             token = S.getDiscord( no )
             if token == False : continue #tokenが入っていないならスキップ
+            amb_conf = S.getAmbientInfo( no )
+            if amb_conf == None : amb_url = ""  #-- AmbientURLが未設定 
             C.logger.info(f"notifyList {notifyList4Node}")
             for notify in notifyList4Node :
                 if notify['mac'].startswith('00:00:00') : continue # Node情報ならSKIP
@@ -371,6 +371,7 @@ def _send_cloud() :
     for node in range(1, S.numNode() + 1 ) :
         # -- ノードのチャンネルデータを取り出す
         amb_conf = S.getAmbientInfo(node)
+        if amb_conf == None : continue  # -- Ambentが未設定ならSKIP    
         ##-- Nodeを指定して配列再生成
         res = [[d['node'], d['mac'], d['templ'], d['ambient_conf']] for d in sensDATAs if d['node'] == node]
         #print(res)

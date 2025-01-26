@@ -119,7 +119,7 @@ def WaitAUX() :
     C.logger.info("E220-900T22 Wait AUX PIN...")
     while not GPIO.input( AUX_PIN ) :
         C.logger.debug(">>Not Ready..")
-        time.sleep(1)
+        time.sleep(0.2)
     C.logger.info("E220-900T22 is Ready!!")
 
 def Led( type="RED", sw=True ) :
@@ -392,8 +392,12 @@ class Lora_NODE :
 
     def _send_data(self) :
         ''' Thread起動 LoRa Data Sender '''
-        C.logger.debug("Send Data ... ")
+        C.logger.debug("[_send_data] Send Data ... START")
         S = SQL() ### Thread用に必須
+
+        setMode(0)
+        WaitAUX()
+        C.logger.info("Lora Module Wakeup... done")
 
         sendDATA = list()
 
@@ -401,7 +405,8 @@ class Lora_NODE :
         node_mac = '00:00:00:00:00:0'+str(self._NodeNo)
         templ = M.getMachine_Temp()
         seq = self.getSeq()  
-        sendDATA.append( data_pack( self._NodeNo, seq, node_mac, int(time.time()), templ, 0.0, 0, 0, 0 ) )
+        batt = M.getBatteryPiSugar3()
+        sendDATA.append( data_pack( self._NodeNo, seq, node_mac, int(time.time()), templ, 0.0, batt, 0, 0 ) )
 
         ## センサーの情報をSQLから取得
         sensorDATA = S.getLatestDATA(NODE_NO, delete=True)
@@ -436,6 +441,11 @@ class Lora_NODE :
             C.logger.info("recv: ACK ")
         else :
             C.logger.error(f"recv: {ret}")
+
+        ## LoRa Module DeepSleep
+        setMode(3)
+        WaitAUX()
+        C.logger.info("Lora Module sleep zzzz....")
 
     def _wait_ack(self, sequence, TIME_OUT = 1 ) :
         ''' ホストから戻りコードを受信する'''
@@ -512,6 +522,10 @@ class Lora_NODE :
     def _beaconReciver(self) :
         ''' Beaconを受信する SEQ=1受信すると送信間隔を設定して終了 '''
         C.logger.info("Start Beacon Reciver.")
+
+        setMode(0)
+        WaitAUX()
+
         S = SQL() ## thread起動で必須
         S.changeNodeStatus(C.NODE_STAT.WAIT_BEACON.value)
         Led( "RED", True)
@@ -531,6 +545,9 @@ class Lora_NODE :
                 S.changeNodeStatus(C.NODE_STAT.GOOD.value)
                 Led( "GREEN" , False )
                 break
+
+        setMode(3)
+        WaitAUX()
         C.logger.info("Terminate Beacon Reciver.")
     
     def _recv_beacon(self) :
@@ -701,8 +718,8 @@ if __name__ == "__main__" :
             print(f"lilbLoRa.py -- START for NODE{NODE_NO:02}")
 
             ## E220 LoRa Module init
-            setMode(0)
-            WaitAUX()
+            #setMode(0)
+            #WaitAUX()
 
             ## START UP Lora Thread
             NODE = Lora_NODE(NODE_NO)

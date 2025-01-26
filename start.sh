@@ -15,8 +15,8 @@ function LED_red () {
 }
 
 # Green LED 0.1秒点灯（スクリプト動作確認用）
-LED_green
-LED_red
+/usr/bin/raspi-gpio set 13 op dh
+/usr/bin/raspi-gpio set 19 op dh
 
 #python Path
 PYTHON="/usr/bin/python3"
@@ -25,14 +25,14 @@ PYTHON="/usr/bin/python3"
 EXE_DIR="$HOME/SAST_V301"
 cd $EXE_DIR
 
+# startup Message
+$PYTHON $EXE_DIR/libOLED.py STARTUP 
+
 # プロセスKILL
 echo "Kill Python3 Process ... "
 /usr/bin/sudo /usr/bin/killall python3
 echo "done."
 echo ""
-
-# startup Message
-$PYTHON $EXE_DIR/libOLED.py STARTUP 2>> stderr.log
 
 # ホスト名取得
 host=$(hostname)
@@ -50,12 +50,13 @@ echo "hostname is $host > NodeNO is $node" >> stderr.log
 if [ $node == "00" ]; then
 	echo "Type Gateway"
 	echo "Type Gateway"  >> stderr.log
-  $PYTHON $EXE_DIR/libOLED.py STARTUP "Waiting for" "Connection..." 2>> stderr.log
+  	$PYTHON $EXE_DIR/libOLED.py STARTUP "Waiting for" "Connection..." 2>> stderr.log
 	while ! ping -c 1 google.com > /dev/null; do
 		echo "Waiting for network connection..."  >> stderr.log
 		sleep 2
 	done
 	echo "Network connection established." >> stderr.log
+	/usr/bin/raspi-gpio set 13 op dl
 	echo "Start libOLED" >> stderr.log
 	$PYTHON $EXE_DIR/libOLED.py 2>> stderr.log &
 	sleep 1
@@ -65,6 +66,8 @@ if [ $node == "00" ]; then
 	echo "Start SAST_observer" >> stderr.log
 	$PYTHON $EXE_DIR/SAST_observer.py 2>> stderr.log &
 	echo "check SAST_observer process EXIT.... until 10sec" 
+	/usr/bin/raspi-gpio set 13 op dl
+	/usr/bin/raspi-gpio set 19 op dl
 	wait $!
 	if [ $? -ne 0 ]; then
 		echo "SAST_observer System ERROR.... Don't Continue."
@@ -75,6 +78,7 @@ else
 	echo "Type Node"
 	echo "Type Node" >> stderr.log
 	echo "Start libOLED" >> stderr.log
+	/usr/bin/raspi-gpio set 13 op dl
 	$PYTHON $EXE_DIR/libOLED.py 2>> stderr.log &
 	sleep 1
 	echo "Start libLORA" >> stderr.log
@@ -82,6 +86,8 @@ else
 	sleep 5
 	echo "Start SAST_recorder" >> stderr.log
 	$PYTHON $EXE_DIR/SAST_recorder.py 2>> stderr.log &
+	/usr/bin/raspi-gpio set 13 op dl
+	/usr/bin/raspi-gpio set 19 op dl
 fi
 echo "shell script done."
 echo ""

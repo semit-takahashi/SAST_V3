@@ -144,12 +144,20 @@ class OLED:
         else :
             self._draw.rectangle(( 0, y[1],l*8+1,y[2]), outline=0, fill=0)  # --- IPアドレスの幅だけ塗りつぶし 2025/01/22
             self._draw.rectangle(( 0, y[2],self._width,self._height), outline=0, fill=0)
-
+        ## -- IP
         self._draw.text((0, y[1]+i), f"{IPAddr}", font=self.fontS, fill=255)
-        self._draw.text((0, y[2]+i), f"  1:{rssi[0]:4d}   2:{rssi[1]:4d}", font=self.fontS, fill=255)
-        self._draw.text((0, y[3]+i), f"  3:{rssi[2]:4d}   4:{rssi[3]:4d}", font=self.fontS, fill=255)
+        ## - RSSI
+        rs_xy=[(0,y[2]),(0,y[3]),(7*6,y[2]),(7*6,y[3]),(14*8,y[2]),(14*8,y[3])]
+        for i in range(0, len(rssi) ) :
+            self._draw.text(rs_xy[i], f"{i}:{rssi[i]:4d}", font=self.fontS, fill=255)
+        ## - BATT        
+        batt = M.getBatteryPiSugar3()
+        if batt != -1 : 
+            self._draw.rectangle((128-3*8,y[3], self._width,self._height), outline=0, fill=0)
+            self._draw.text((128-3*8,y[3]),f"{batt:3d}", font=self.font, fill=255)
+
+        ### -- VIEW
         self._disp.image(self._image)
-        #self._makeDate(i,0)
         self._disp.display()
         self._lock.release() # 排他制御解除
 
@@ -170,17 +178,22 @@ class OLED:
             self._draw.rectangle(( 0, 0,self._width,self._height), outline=0, fill=0)
             self._draw.text((0, y[0]+i), f"N{node:02d}", font=self.font, fill=255)
         else :
-            self._draw.rectangle(( 0, y[1],8*8+1,y[2]), outline=0, fill=0)  # --- 機器温度の部分のみ塗りつぶし 2025/01/22
+            self._draw.rectangle(( 0, y[1],10*8+1,y[2]), outline=0, fill=0)  # --- 機器温度の部分のみ塗りつぶし 2025/01/22
             self._draw.rectangle(( 0, y[2],self._width,self._height), outline=0, fill=0)
-
-        self._draw.text((0, y[1]+i), f"TEMP:{templ:5.1f}C", font=self.font, fill=255)
+        ## -- TEMP,SENS,STATUS
+        self._draw.text((0, y[1]+i), f"TEMP:{templ:3.0f}C", font=self.font, fill=255)
         self._draw.text((0, y[2]+i), f"SENS:{sens:2}", font=self.font, fill=255)
         self._draw.text((0, y[3]+i), f" {C.NODE_STAT(stat).name}", font=self.font, fill=255)
-        if ssid != "" :
-            xs = self._width - (len(ssid)+2)*6 
-            self._draw.text((xs, y[3]+i), f"[{ssid}]]", font=self.fontS, fill=255)
+        ## -- SSID
+        if ssid != "" : self._draw.text((8*8, y[2]+i), f"[{ssid}]", font=self.fontS, fill=255)
+        ## - BATT        
+        batt = M.getBatteryPiSugar3()
+        if batt != -1 : 
+            self._draw.rectangle((128-3*8,y[3], self._width,self._height), outline=0, fill=0)
+            self._draw.text((128-3*8,y[3]),f"{batt:3d}", font=self.font, fill=255)
+
+        ### -- VIEW
         self._disp.image(self._image)
-        #self._makeDate(i,0)
         self._disp.display()
         self._lock.release() # 排他制御解除
     
@@ -229,7 +242,7 @@ class OLED:
         nodeno = M.getNodeNo()
         C.logger.info(f"START OLED for Node{nodeno}")
         allSens = list()
-        allSens = S.numSensorsMe(nodeno)
+        allSens = S.numSensorsMe()
         ssid = M.getSSID()
         stat = C.NODE_STAT.NONE
         # 初期表示
@@ -247,7 +260,7 @@ class OLED:
                 stat = C.NODE_STAT.NONE
             #C.logger.info(f"NODE STAT = {C.NODE_STAT(stat)}")
             ssid = M.getSSID()
-            allSens = S.numSensorsMe(nodeno)
+            allSens = S.numSensorsMe()
             self.viewNODE(M.getNodeNo(), allSens, stat, ssid, update=True)
             time.sleep(5)
 
@@ -293,7 +306,7 @@ if __name__ == '__main__':
                 mess = []
                 for i in range(2, len(args) ) :
                     mess.append(args[i])
-                C.loggerOLED.info(f">START: {mess}")
+                #C.loggerOLED.info(f">START: {mess}")
                 o.showSTARTUP(mess)
                 sys.exit()
 

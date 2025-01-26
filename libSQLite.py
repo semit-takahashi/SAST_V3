@@ -180,7 +180,6 @@ class SQL:
         span = datetime.datetime.now()-datetime.timedelta(hours=1)
         span_str = span.strftime("%Y-%m-%d %H:%M:%S")
         query = f"SELECT count( distinct mac) from history where date>'{span_str}'"
-        print(query)
         c = self.connection.cursor()
         try :
             c.execute(query)
@@ -867,6 +866,9 @@ class SQL:
                 data = json.loads(res[0])
                 #C.logger.debug(f"NODE:{node_no}>{data}")
                 return data
+            return None
+        except json.JSONDecodeError as e:
+            C.logger.error(f"[getAmbientInfo] ERROR: {e}")
             return None
 
         except sqlite3.Error as e:
