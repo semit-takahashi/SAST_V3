@@ -24,7 +24,7 @@ I2C_BUS = 1
 I2C_PiSugar = 0x68
 I2C_PiSugar_REG = 0x57
 
-def _existI2Cevice(address):
+def _existI2CDevice(address):
     """ I2Cデバイスが存在するか？"""
     try:
         bus = smbus2.SMBus(I2C_BUS)
@@ -41,14 +41,19 @@ def _existI2Cevice(address):
 def getBatteryPiSugar3() :
     """ PiSugar3 のI2Cレジスタ(0x57）からバッテリー容量を返す
         I2Cが無い場合やアクセス不可の場合は-1を返す
+        2025/01/30修正
+        RTCの一部製品でEEPROMがある製品は、正しく値が返ってくる。
+        この場合、0xffが戻り値なら-1を返す。
     """
     level = -1
     try:
         bus = smbus2.SMBus(I2C_BUS)
         level= bus.read_byte_data(I2C_PiSugar_REG, 0x2a)
+        if level == 255 : level = -1
 
     except Exception as e:
-        C.logger.warning(f"No DATA from {I2C_PiSugar_REG} addr.")
+        #C.logger.warning(f"No DATA from {I2C_PiSugar_REG} addr.")
+        level = -1
     
     finally:
         bus.close()
@@ -320,7 +325,7 @@ if __name__ == '__main__':
     print(f"Serial : {getSerial()}")
     print(f"CPU%   : {getCPU()}")
 
-    print(f"PiSugar: {_existI2Cevice(I2C_PiSugar)}")
+    print(f"PiSugar: {_existI2CDevice(I2C_PiSugar)}")
     print(f"PiSugar3 Battery Level : {getBatteryPiSugar3()}")
     
 

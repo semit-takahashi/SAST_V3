@@ -1087,6 +1087,8 @@ if __name__ == '__main__':
         S = SQL()
         print("node RSSI")
         ret = S.getNodeRSSI()
+        num = S.numNode()
+        print(f"node:{num}")
         pprint.pprint(ret)
     
     elif len(args) != 1 and args[1].upper() == "AMB_INDEX" :

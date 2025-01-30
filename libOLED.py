@@ -135,7 +135,6 @@ class OLED:
         self._lock.acquire() # 排他制御開始
         i = TOP_MARGINE
         y = [0,16,32,48]
-        cpu = M.getCPU()
         l=len(IPAddr)
         #self._draw.rectangle(( 0, 0,self._width-1,self._height-1), outline=1, fill=0)  枠線
         if not update :
@@ -147,9 +146,9 @@ class OLED:
         ## -- IP
         self._draw.text((0, y[1]+i), f"{IPAddr}", font=self.fontS, fill=255)
         ## - RSSI
-        rs_xy=[(0,y[2]),(0,y[3]),(7*6,y[2]),(7*6,y[3]),(14*8,y[2]),(14*8,y[3])]
-        for i in range(0, len(rssi) ) :
-            self._draw.text(rs_xy[i], f"{i}:{rssi[i]:4d}", font=self.fontS, fill=255)
+        rs_xy=[(0,0),(0,y[2]),(0,y[3]),(7*6,y[2]),(7*6,y[3]),(14*8,y[2]),(14*8,y[3])]
+        for i in range(0, len(rssi) ) : 
+            self._draw.text(rs_xy[i], f"{i+1}:{rssi[i]:4d}", font=self.fontS, fill=255)
         ## - BATT        
         batt = M.getBatteryPiSugar3()
         if batt != -1 : 
@@ -236,9 +235,7 @@ class OLED:
 
 
     def loopNode(self) :
-        """ NODE用 OLEDメインループ
-
-        """
+        """ NODE用 OLEDメインループ  """
         nodeno = M.getNodeNo()
         C.logger.info(f"START OLED for Node{nodeno}")
         allSens = list()
@@ -246,12 +243,13 @@ class OLED:
         ssid = M.getSSID()
         stat = C.NODE_STAT.NONE
         # 初期表示
-        self.viewNODE(M.getNodeNo(), allSens, stat, ssid )
+        self.viewNODE(nodeno, allSens, stat, ssid )
  
         # 時計更新スレッド起動
         thr_date = threading.Thread( target=o.viewDate, name='time', daemon=True )
         thr_date.start()
 
+        # 情報更新
         while True:
             try :
                 stat = S.getNodeStatus()
@@ -261,10 +259,11 @@ class OLED:
             #C.logger.info(f"NODE STAT = {C.NODE_STAT(stat)}")
             ssid = M.getSSID()
             allSens = S.numSensorsMe()
-            self.viewNODE(M.getNodeNo(), allSens, stat, ssid, update=True)
-            time.sleep(5)
+            self.viewNODE(nodeno, allSens, stat, ssid, update=True)
+            time.sleep(10)  # 10秒おきに更新
 
     def loopGateWay(self) -> None :
+        """ GATEWAY用 OLEDメインループ  """
         C.logger.info("START GateWay OLED ")
         rssi = S.getNodeRSSI()
         ip = M.getIPAddr()
@@ -274,15 +273,13 @@ class OLED:
         # 時計スレッド機能
         thr_date = threading.Thread( target=o.viewDate, name='time', daemon=True )
         thr_date.start()
-        i=0
+
+        #情報更新
         while True:
-            if i==0 : # 10回に1回の実行
-                rssi = S.getNodeRSSI()
-                ip = M.getIPAddr()
-                i = (i+1)%10
-                ssid = M.getSSID()
+            rssi = S.getNodeRSSI()
+            ip = M.getIPAddr()
             o.viewGATEWAY(ip, rssi, update=True)
-            time.sleep(5) 
+            time.sleep(10)  # 10秒おきに更新
 
     def _intr_term(self, num, frame) :
         C.logger.warning("SIGTERM catch exit...")
