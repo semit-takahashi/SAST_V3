@@ -73,7 +73,7 @@ class OLED:
         # signal term
         signal.signal(signal.SIGTERM, self._intr_term)
         signal.signal(signal.SIGHUP, self._intr_term)
-        #signal.signal(signal.SIGKILL, self.intr_term)
+        signal.signal(signal.SIGUSR1, self._intr_user1)
         
 
     def clear(self):
@@ -101,14 +101,24 @@ class OLED:
         NET = M.getTypeIP(IP)
         #Temp = M.getMachine_Temp()
         SSID = M.getSSID()
-        DISK = M.getDiskSpace()
+        RSSI = S.getNodeRSSI(NODE)
+        #DISK = M.getDiskSpace()
      
         ## --- _display
-        self._draw.rectangle(( 0, 0,self._width,self._height), outline=0, fill=0)
-        self._draw.text((0,  0), f"{NODE}  {IP}",font=self.fontS, fill=255)
-        self._draw.text((0, 13), f">{SSID}", font=self.fontS, fill=255)
-        #self._draw.text((0, 22), f"{HOST}", font=self.fontS, fill=255)
-        self._draw.text((40, 47), f"{C.getTimeSTR(short=True)}", font=self.font, fill=255)
+        y = [0,16,32,48]
+        self._draw.rectangle((0, y[1],self._width,self._height), outline=0, fill=0)
+
+        ## 2nd Line
+        self._draw.text((0,y[1]), f"{NODE} {IP}",font=self.fontS, fill=255)
+
+        ## 3rd Line
+        self._draw.text((0,y[2]), f"{SSID}",font=self.fontS, fill=255)
+
+        ## 4th Line- BATT        
+        batt = M.getBatteryPiSugar3()
+        if batt != -1 : 
+            self._draw.text((0,y[3]),f"R:{RSSI} B:{batt:3d}%", font=self.font, fill=255)
+        
         self._disp.image(self._image)
         self._disp.display()
 
@@ -179,17 +189,22 @@ class OLED:
         else :
             self._draw.rectangle(( 0, y[1],10*8+1,y[2]), outline=0, fill=0)  # --- 機器温度の部分のみ塗りつぶし 2025/01/22
             self._draw.rectangle(( 0, y[2],self._width,self._height), outline=0, fill=0)
+
         ## -- TEMP,SENS,STATUS
         self._draw.text((0, y[1]+i), f"TEMP:{templ:3.0f}C", font=self.font, fill=255)
         self._draw.text((0, y[2]+i), f"SENS:{sens:2}", font=self.font, fill=255)
         self._draw.text((0, y[3]+i), f" {C.NODE_STAT(stat).name}", font=self.font, fill=255)
+
         ## -- SSID
-        if ssid != "" : self._draw.text((8*8, y[2]+i), f"[{ssid}]", font=self.fontS, fill=255)
+        if ssid != "" : self._draw.text((8*8, y[2]+i), f"{ssid}", font=self.fontS, fill=255)
+
         ## - BATT        
         batt = M.getBatteryPiSugar3()
+        charge = M.isChargePiSuger3()
         if batt != -1 : 
             self._draw.rectangle((128-3*8,y[3], self._width,self._height), outline=0, fill=0)
-            self._draw.text((128-3*8,y[3]),f"{batt:3d}", font=self.font, fill=255)
+            bt = "@" if M.isChargePiSuger3() else  " "
+            self._draw.text((128-4*8,y[3]),f"{bt}{batt:3d}", font=self.font, fill=255)
 
         ### -- VIEW
         self._disp.image(self._image)
@@ -282,9 +297,19 @@ class OLED:
             time.sleep(10)  # 10秒おきに更新
 
     def _intr_term(self, num, frame) :
+        """ Signal Shutdown """
         C.logger.warning("SIGTERM catch exit...")
         o.clear()
         sys.exit(0)
+
+    def _intr_user1(self, num ,frame ) :
+        """ signal SIGUSR1 """
+        C.logger.warning("signal SIGUSR1 ... show PI Info")
+        o.showPI()
+        time.sleep(5)
+        return
+
+        
 
 S = S.SQL()
 if __name__ == '__main__':
@@ -329,18 +354,19 @@ if __name__ == '__main__':
                 o.loopNode()
 
         else : # テストじゃない
-            node = M.getNodeNo()
+            while True :
+                node = M.getNodeNo()
 
-            if node == 0 :
-                print(f"libOLED.py -- START GATE")
-                o.clear()
-                o.loopGateWay()
+                if node == 0 :
+                    print(f"libOLED.py -- START GATE")
+                    o.clear()
+                    o.loopGateWay()
 
-            else :
-                print(f"libOLED.py -- START NODE({node:02})")
-                o.clear()
-                o.loopNode()
-                
+                else :
+                    print(f"libOLED.py -- START NODE({node:02})")
+                    o.clear()
+                    o.loopNode()
+            
         '''
         TODO
         プログラムからの表示内容更新は、mqueue（PISIX IPC）を使って実装

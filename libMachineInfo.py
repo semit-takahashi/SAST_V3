@@ -38,6 +38,23 @@ def _existI2CDevice(address):
         bus.close()
     return ret
 
+def isChargePiSuger3() :
+    """ PiSugar3で充電中なのかを認識 True/False"""
+    charge = False
+    try:
+        bus = smbus2.SMBus(I2C_BUS)
+        chr = bus.read_byte_data(I2C_PiSugar_REG, 0x02)
+        if chr & 0x80 != 0: charge = True
+        #print(f"isChargePiSuger3 {bin(chr)}")
+
+    except Exception as e:
+        pass
+
+    finally:
+        bus.close()
+        return charge
+   
+
 def getBatteryPiSugar3() :
     """ PiSugar3 のI2Cレジスタ(0x57）からバッテリー容量を返す
         I2Cが無い場合やアクセス不可の場合は-1を返す
@@ -45,7 +62,6 @@ def getBatteryPiSugar3() :
         RTCの一部製品でEEPROMがある製品は、正しく値が返ってくる。
         この場合、0xffが戻り値なら-1を返す。
     """
-    level = -1
     try:
         bus = smbus2.SMBus(I2C_BUS)
         level= bus.read_byte_data(I2C_PiSugar_REG, 0x2a)
@@ -58,6 +74,7 @@ def getBatteryPiSugar3() :
     finally:
         bus.close()
         return level
+
 
 '''
 def getBatteryPiSugar() :
@@ -326,6 +343,7 @@ if __name__ == '__main__':
     print(f"CPU%   : {getCPU()}")
 
     print(f"PiSugar: {_existI2CDevice(I2C_PiSugar)}")
+    print(f"PuSugar3 Power Connect? : {isChargePiSuger3()}")
     print(f"PiSugar3 Battery Level : {getBatteryPiSugar3()}")
     
 

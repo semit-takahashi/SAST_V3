@@ -243,7 +243,7 @@ def IsRegistMAC( mac ) -> bool :
 def _send_cloud() :
     """GATEWAYのSQLに入っているデータを選別してCloudに送信する
        ・通知が必要かをチェック
-       ・必要な物を通知
+       ・必要な物を通知 Discrod
        ・Ambient送信
        ・GAPPS送信
     """
@@ -268,6 +268,9 @@ def _send_cloud() :
     #for d in notifyListAll :
     #    C.logger.debug(f"L: {d['mac']} - {d['node']}/{d['date']}/{d['lost_date']}/{d['status']}/{d['count']}")
 
+
+    ## ============================================================================================
+    #  センサー温度が閾値超えかをチェック
     C.logger.info(f"Judgement SENS:{len(sensDATAs)}/NOTIFY:{len(notifyListAll)}")
     for n in notifyListAll :
         # センサーデータを検索
@@ -336,7 +339,8 @@ def _send_cloud() :
             ## 15分未満の場合は無視
             C.logger.debug(f"OTHER ... SKIP")
 
-    ## === discord 通知処理
+    ## ============================================================================================
+    #  discord 通知処理
     C.logger.info("Notify to discord ...")
     max_node = S.numNode() # ノード数を取得
     for no in range(1, max_node + 1 ) : #ノード数でループ
@@ -365,7 +369,8 @@ def _send_cloud() :
             if mess != "" : ## メッセージが作成されていれば通知
                 POST_discord( mess, token, amb_url )
 
-    ## === Ambient送信
+    ## ===========================================================================================
+    #  Ambient送信
     C.logger.info("Make Ambient DATA. ")
     ## ---　ノード毎でMACを纏めて、データを生成し、Ambientに送信する
     for node in range(1, S.numNode() + 1 ) :
@@ -375,8 +380,17 @@ def _send_cloud() :
         ##-- Nodeを指定して配列再生成
         res = [[d['node'], d['mac'], d['templ'], d['ambient_conf']] for d in sensDATAs if d['node'] == node]
         #print(res)
-        #if len(res) == 0 : continue #-- そのノードの送信データが無いのでSKIP
-        data = { 'd1':0,'d2':0,'d3':0,'d4':0,'d5':0,'d6':0,'d7':0,'d8':0 }
+
+        # 送信データのセット
+        data = {}
+        if C.AMB_SEND_NODATA : 
+            # データが設定されていなくてもAmbientに送る場合は、全データをセットしておく
+            data = { 'd1':0,'d2':0,'d3':0,'d4':0,'d5':0,'d6':0,'d7':0,'d8':0 }
+        else :
+            # データを送ら無いときで、センサーデータ無いときはデータ送信をスキップ
+            if len(res) == 0 : continue #-- そのノードの送信データが無いのでSKIP
+
+        # 送信データの作成
         for sens in res :
             if sens[1].startswith("00:00:00:00:00:") : continue ## -- NodeはSKIP
             #print(sens)
@@ -390,7 +404,9 @@ def _send_cloud() :
         sent_Ambient( amb_conf, data)
 
 
-    ## === GAS 送信
+
+    ## ============================================================================================
+    #  GAS 送信
     C.logger.info("Send Google Apps Script (GAS) ....")
     dataS = []
     for data in sensDATAs :
@@ -426,55 +442,82 @@ def _getSetting4GApps( verbose=False ) :
         C.logger.error(f"[observer] HTTP Connection Error : {e} .... SKIP")
         return False
 
+    # データがGASから取得できた
     if res.status_code == 200 :
         S = SQL.SQL()
         updateDate = None
         try : 
             updateDate = datetime.datetime.strptime(res.json()[0]['date'], "%Y/%m/%d %H:%M:%S")
+
         except ValueError as e:
-            C.logger.error(f"Update Date is Invalid ... {res.json()[0]['date']}")
+            ## GASの日付エラー
+            mess = f"Update Date is Invalid ... {res.json()[0]['date']}"
+            C.logger.error(mess)
+            _sendACK2GAS( mess )
             return False
 
+        # GASデータの取得
         confData = []
         for d in res.json()[1:] :
             confData.append(d)
-            #print(confData)
+        (ret, mess ) = S.updateSystemConf( confData, updateDate )
 
-        ret = S.updateSystemConf( confData, updateDate )
-        if ret == None :
-            C.logger.error(f"Update Error. {time.time() - start:.2f}sec")
-        elif ret :
+        if verbose :
+            import pprint
+            C.logger.info(pprint.pformat(confData))
+        
+
+        if ret :
             C.logger.info(f"Update done. {time.time() - start:.2f}sec")
-            # 更新したのでACKを返送(5回実施)
-            count = 0
-            while True :
-                try :
-                    res = requests.get(f"{C.GAS}?sens=ack", headers=header)
-                except Exception as e :
-                    C.logger.error(f"HTTP Connection Error : {e} .... SKIP")
-                    return False
+            if verbose :
+                import pprint
+                C.logger.info(pprint.pformat(confData))
+            _sendACK2GAS( mess )
+            return True
+            
+        elif ret == None :
+            C.logger.error(f"Update Error. {time.time() - start:.2f}sec")
+            _sendACK2GAS( mess )
 
-                if res.status_code == 200 :
-                    C.logger.warning("ACK response OK done.")
-
-                    # 成功時のみダウンロードを表示
-                    if verbose :
-                        import pprint
-                        C.logger.info(pprint.pformat(confData))
-
-                    return True
-                else :
-                    if count <= 5 : 
-                        C.logger.warning(f"ACK response ERROR {res.status_code} ... retry 30 sec")
-                        time.sleep(30)
-                        count += 1
-                    else :
-                        C.logger.warning(f"ACK response ERROR {res.status_code} ... SKIP")
-                        return False
         else :
             C.logger.warning(f"----- No update required {time.time() - start:.2f}sec")
+            _sendACK2GAS( mess )
+            return False
+
     else :
         C.logger.error(f"Connection Error code:{res.status_code}  {time.time() - start:.2f}sec")
+        _sendACK2GAS( mess )
+        C.logger.debug(f"MESS{mess}")
+
+
+def _sendACK2GAS( message ) :
+    """ 内部関数：GASにACKを送信（メッセージ付き）"""
+
+    # ACKを返送(5回実施)
+    header = {"content-type": "application/json"}
+    count = 0
+    while True :
+        try :
+            res = requests.get(f"{C.GAS}?sens=ack&mess={message}", headers=header)
+
+        except Exception as e :
+            C.logger.error(f"HTTP Connection Error : {e} .... SKIP")
+            return False
+            
+
+        if res.status_code == 200 :
+            C.logger.info("ACK response OK done.")
+            return True
+
+        else :
+            if count <= 5 : 
+                C.logger.warning(f"ACK response ERROR {res.status_code} ... retry 10 sec")
+                time.sleep(10)
+                count += 1
+            else :
+                C.logger.warning(f"ACK response ERROR {res.status_code} ... SKIP")
+                return False
+
 
 def _checkBattery() :
     """ センサーのバッテリーをチェックして通知する """

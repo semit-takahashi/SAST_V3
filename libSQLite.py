@@ -750,6 +750,7 @@ class SQL:
             True  : 更新成功
             False : 更新不要（更新日が過去）
             None  : 更新できない（システムエラー）
+            + mess : エラーメッセージ
         """ 
 
         C.logger.debug(f"updateSystemConf({cloud_date})")
@@ -765,31 +766,45 @@ class SQL:
                 if conf_date == cloud_date :
                     # 更新日が一緒なので更新しない
                     #C.logger.info("No updates needed..")
-                    return False
+                    return False, ""
         except sqlite3.Error as e:
-            C.logger.error(f"[updateSystemConf] ERROR : {e}")
-            return None
+            mess = f"[updateSystemConf] ERROR : {e}"
+            C.logger.error(mess)
+            return None, mess
 
-        # 情報更新
-        C.logger.info(f"Update configure.... {conf_date} -> {cloud_date}")
-        column = ', '.join(data[0].keys())
-        placeholder = ':'+', :'.join(data[0].keys())
-        # 既存データの削除
-        sql = "DELETE from conf"
-        c.execute(sql)
-        # 最新データのインサート
-        sql = f"INSERT INTO conf({column}) VALUES({placeholder})"
-        for d in data :
-          d['mac'] = d['mac'].lower() #macを小文字に変換
-          c.execute(sql, d )
-        # 更新日付の更新
-        sql=f"REPLACE INTO conf_date(id, date) VALUES(1, '{cloud_date}')"
-        c.execute(sql)
-        c.connection.commit()
+        try : 
+            # 情報更新
+            C.logger.info(f"Update configure.... {conf_date} -> {cloud_date}")
+            column = ', '.join(data[0].keys())
+            placeholder = ':'+', :'.join(data[0].keys())
+
+            # トランザクション開始
+            c.execute('BEGIN TRANSACTION;')
+
+            # 既存データの削除
+            sql = "DELETE from conf"
+            c.execute(sql)
+ 
+            # 最新データのインサート
+            sql = f"INSERT INTO conf({column}) VALUES({placeholder})"
+            for d in data :
+                d['mac'] = d['mac'].lower() #macを小文字に変換
+                c.execute(sql, d )
+ 
+            # 更新日付の更新
+            sql=f"REPLACE INTO conf_date(id, date) VALUES(1, '{cloud_date}')"
+            c.execute(sql)
+            c.connection.commit()
+
+        except sqlite3.Error as e:
+            mess = f"[updateSystemConf] UPDATE ERROR : {e}"
+            c.connection.rollback()
+            C.logger.error(mess)
+            return None, mess
 
         # Notify Table 構築
         self.initNotify()
-        return True
+        return True, "Update done."
 
     def _getSensors(self, valid=True) :
         """有効なセンサーのリスト

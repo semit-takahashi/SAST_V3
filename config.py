@@ -32,6 +32,9 @@ AMB = {
 'URL':"https://ambidata.io/bd/board.html?id="    
 }
 
+###### Non Data send to Ambient
+AMB_SEND_NODATA = False
+
 ###### Logging
 import logging
 import logging.handlers  as ih
@@ -46,7 +49,7 @@ logger.setLevel(logging.DEBUG)
 ### --- Screen
 stream_Handler = logging.StreamHandler()
 stream_Handler.setLevel(logging.WARNING)
-stream_Handler.setFormatter(logging.Formatter('%(asctime)s %(module)s %(levelname)s(%(filename)s):%(message)s'))
+stream_Handler.setFormatter(logging.Formatter('%(asctime)s::%(module)s:%(levelname)s:%(message)s'))
 
 ### --- Syslog --- facility is local1
 syslog_Handler = ih.SysLogHandler(address="/dev/log",facility=ih.SysLogHandler.LOG_LOCAL1)
