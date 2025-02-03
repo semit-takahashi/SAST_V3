@@ -169,8 +169,12 @@ def sent_Ambient( amb_conf, sendDATA ):
             ret = am.send(sendDATA)
             if ret.status_code == 200 :
                 C.logger.info(f"Response({ret.status_code}) done")
-                time.sleep(0.2)
                 return True
+            elif ret.status_code == 403 :
+                C.logger.warning(f"Response({ret.status_code}) wait 3 sec")
+                time.sleep(3)
+                continue
+
             else :
                 C.logger.warning(f"Response({ret.status_code}) ")
                 time.sleep(0.2)

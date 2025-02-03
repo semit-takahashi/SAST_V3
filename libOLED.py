@@ -156,14 +156,17 @@ class OLED:
         ## -- IP
         self._draw.text((0, y[1]+i), f"{IPAddr}", font=self.fontS, fill=255)
         ## - RSSI
-        rs_xy=[(0,0),(0,y[2]),(0,y[3]),(7*6,y[2]),(7*6,y[3]),(14*8,y[2]),(14*8,y[3])]
+        rs_xy=[(0,y[2]),(0,y[3]),(7*6,y[2]),(7*6,y[3]),(14*6,y[2]),(14*6,y[3])]
         for i in range(0, len(rssi) ) : 
             self._draw.text(rs_xy[i], f"{i+1}:{rssi[i]:4d}", font=self.fontS, fill=255)
+
+        ''' GATEWAYはバッテリ無しなので削除
         ## - BATT        
         batt = M.getBatteryPiSugar3()
         if batt != -1 : 
             self._draw.rectangle((128-3*8,y[3], self._width,self._height), outline=0, fill=0)
             self._draw.text((128-3*8,y[3]),f"{batt:3d}", font=self.font, fill=255)
+        '''
 
         ### -- VIEW
         self._disp.image(self._image)
@@ -200,10 +203,9 @@ class OLED:
 
         ## - BATT        
         batt = M.getBatteryPiSugar3()
-        charge = M.isChargePiSuger3()
         if batt != -1 : 
             self._draw.rectangle((128-3*8,y[3], self._width,self._height), outline=0, fill=0)
-            bt = "@" if M.isChargePiSuger3() else  " "
+            bt = "@" if M.isChargePiSuger3() else  " " # -- 充電中は＠表示
             self._draw.text((128-4*8,y[3]),f"{bt}{batt:3d}", font=self.font, fill=255)
 
         ### -- VIEW
