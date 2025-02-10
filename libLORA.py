@@ -412,7 +412,7 @@ class Lora_NODE :
         sensorDATA = S.getLatestDATA(NODE_NO, delete=True)
         C.logger.debug(f"Sensor is ({len(sensorDATA)})")
         for s in sensorDATA :
-            s['status'] = S.getStatus( s['mac'])
+            s['status'] = S.getStatus( s['mac'] )
             C.logger.debug(f"SENSOR : {s}")
             sendDATA.append( data_pack( self._NodeNo, seq, s['mac'], C.toTimespan(s['date']), s['templ'], s['humid'], s['batt'], s['rssi'], s['status'] ))
         

@@ -144,12 +144,17 @@ def getIPAddr( iface = 'wlan0', subnet=False ):
     Returns:
         str: IPアドレス文字列
     """
-    ip = ipget.ipget()
-    if ip == '' :
+    try :
+        ip = ipget.ipget()
+        if ip == '' :
+            return '0.0.0.0'
+        if subnet :
+            return ip.ipaddr( iface )
+        return ip.ipaddr(iface).split('/')[0]
+
+    except ValueError as e :
+        C.logger.warning(f"getIPAddr  : {e}")
         return '0.0.0.0'
-    if subnet :
-        return ip.ipaddr( iface )
-    return ip.ipaddr(iface).split('/')[0]
 
 def getIPAddrV6( iface = 'wlan0' ):
     """IPv6アドレスを返す

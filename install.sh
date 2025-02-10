@@ -6,7 +6,7 @@ DEST_PATH="/home/${DEST_USER}/${SAST_DIR}"
 CURRENT=`pwd`
 
 SRC_PATH=""
-SRC_FILES="start.sh lib*.py config.py SAST_[a-z]*.py setup_bashrc.sh"
+SRC_FILES="start.sh lib*.py config.py SAST_[a-z]*.py setup_bashrc.sh sast.service"
 DBS_FILES="sql_sastv3.sqlite"
 
 SET_PATH="settings"

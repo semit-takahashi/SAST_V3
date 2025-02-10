@@ -170,6 +170,29 @@ class SQL:
             C.logger.error(f"[getNodeStatus] {e}")
             return False
 
+
+    def isArriveNode( self, node ) :
+        """ 指定したNOodeの応答があったか（10分以内）
+
+        Args:
+            node (int): Node番号
+        """
+        C.logger.debug(f"isArriveNode()")
+        ## 10分前の時刻を計算→文字列に変更
+        span = datetime.datetime.now()-datetime.timedelta(minutes=10)
+        span_str = span.strftime("%Y-%m-%d %H:%M:%S")
+        query = f"SELECT count( distinct mac) from history where date>'{span_str}' and mac='00:00:00:00:00:{node:02}'"
+        c = self.connection.cursor()
+        try :
+            c.execute(query)
+            ret = c.fetchone()
+            return True if ret != None else False
+               
+        except sqlite3.Error as e :
+            C.logger.error(f"[isArriveNode] {e}")
+            return 0
+
+
     def numSensorsMe(self) :
         """ Node向け。過去1時間で検知したセンサーの個数を返す（全体数）
         Returns:
@@ -249,27 +272,40 @@ class SQL:
         Args:
             mac (str): センサーMAC
         Returns: tuple
-            sens_name, node_name, nodeNo
+            sens_name, node_name, nodeNo, warn
         """
         C.logger.debug(f"getSensorInfo( {mac} )")
-        query =f"SELECT name, node from conf WHERE mac = '{mac}'"
         c = self.connection.cursor()
         try :
+            query =f"SELECT name, node, warn from conf WHERE mac = '{mac}'"
             c.execute(query)
             res = c.fetchone()
             name = res[0] if res != None else None
             if name == None :
                 C.logger.error(f"getSensorInfo: Not Found MAC {mac}")
+                return None,None,None,None
+
+            warn = {}
+            lC,lW,hW,hC = res[2].split(sep=',')
+            warn['lC'] = None if lC.upper() == 'NONE' else float(lC)
+            warn['lW'] = None if lW.upper() == 'NONE' else float(lW)
+            warn['hW'] = None if hW.upper() == 'NONE' else float(hW)
+            warn['hC'] = None if hC.upper() == 'NONE' else float(hC)
             node_no = int(res[1])
+
             query =f"SELECT name from conf WHERE node = 'LORA{node_no:02}'"
             c.execute(query)
             res = c.fetchone()
             node_name = res[0] if res != None else None
-            return name, node_name, node_no
+            return name, node_name, node_no, warn
+
+        except ValueError as e :
+            C.logger.error(f"[getSensorInfo] {e} < {mac}")
+            return None,None,None,None
         
         except sqlite3.Error as e :
-            C.logger.error(f"[getSensorInfo] {e}")
-            return False
+            C.logger.error(f"[getSensorInfo] {e} < {mac}")
+            return None,None,None,None
 
     def getDiscord( self, node ) :
         """指定したnodeのDiscod Token
@@ -296,7 +332,7 @@ class SQL:
             list() : Node毎のRSSI
         """
         C.logger.debug(f"getNodeRSSI()") 
-        data = [0] * (self.numNode()+1)
+        data = [0] * self.numNode()
         for node in range(1 , self.numNode()+1) :
             query =f"select mac, rssi, date from history where mac LIKE '00:00:00:00:00:{node:02}' order by date desc limit 1"
             c = self.connection.cursor()
@@ -491,7 +527,7 @@ class SQL:
             C.logger.error(f"[updateNotify] {e}")
             return False
 
-    def getNotifyList( self, node_no = 0 , notify=False) -> list :
+    def getNotifyList( self, node_no = 0 , ClearfNotify=False) -> list :
         """ Notifyにてノードを指定したリストを返す
         Args:
             node_no (int): ノード番号（デフォルト0は全取得）
@@ -503,7 +539,7 @@ class SQL:
         data = list()
         c = self.connection.cursor()
         dquery = ""
-        if notify :
+        if ClearfNotify :
             if node_no == 0 :
                 query = f"SELECT node, mac, date, lost_date, status, count, notify FROM notify WHERE notify=1"
                 dquery= f"UPDATE notify SET notify=0"
@@ -517,7 +553,7 @@ class SQL:
                 query = f"SELECT node, mac, date, lost_date, status, count, notify FROM notify WHERE node={node_no}"
                 
         try:
-            if notify :
+            if ClearfNotify :
                 # 通知有りは更新あるのでトランザクション処理
                 c.execute("BEGIN")
 
@@ -525,7 +561,7 @@ class SQL:
             results = c.fetchall()
 
             ## 通知として取得の場合は通知後にフラグ落とす
-            if notify :
+            if ClearfNotify :
                 #C.logger.warning("[getNotifyList] Notify off ")
                 c.execute(dquery)
                 c.connection.commit()
@@ -565,63 +601,6 @@ class SQL:
         except sqlite3.Error as e:
             C.logger.error(f"[getLatest] ERROR : {e}")
             return None
-
-    '''
-    def deleteLatest( self, mac:str ) :
-        """指定されたMACのLatestを削除
-        Args:
-            mnac (str): MACアドレス
-        """
-        C.logger.debug(f"deleteLatest {mac}")
-        try:
-            c = self.connection.cursor()
-            c.execute("DELETE FROM latest where mac = '{mac}'")
-            c.connection.commit()
-        except sqlite3.Error as e:
-            C.logger.error(f"[deleteLatest] ERROR {e}")
-            return None
-    '''
-
-    def getNotify( self, mac ) -> dict: #TODO: delete
-        """指定したMACのnotifyを取得→未利用
-        Args:
-            mac (str): MACアドレス
-        Returns:
-            dict: Notify情報
-        """
-        C.logger.debug(f"getNotify( {mac} )")
-        c = self.connection.cursor()
-        try:
-            query = f"SELECT * from notify where mac = '{mac}'"
-            c.execute(query)
-            res = c.fetchone()
-            if res == None : 
-                #C.logger.error(f"Not found Notify - {mac}")
-                return dict()
-            C.logger.debug(self._encode_notify(res))                
-            return self._encode_notify(res)
- 
-        except sqlite3.Error as e:
-            C.logger.error(f"sqlite3 SELECT ERROR : {e}")
-            return dict()
-
-    '''
-    def deleteNotify( self, mac ) : #TODO: delete
-        """指定したMACのNotifyを削除→未利用
-
-        Args:
-            mac (str): 削除するMACアドレス
-        """
-        C.logger.debug(f"deleteNotify( {mac} )")
-        c = self.connection.cursor()
-        try:
-            query = f"DELETE FROM notify where mac = '{mac}'"
-            c.execute(query)
-            c.connection.commit()
- 
-        except sqlite3.Error as e:
-            C.logger.error(f"[deleteNotify] DELETE ERROR : {e}")
-    '''
 
     def getSensName( self, mac ) :
         """指定したMACの名称を返す
@@ -721,10 +700,8 @@ class SQL:
 
     def getStatus(self, mac ) :
         """指定したmacのstatusを返す
-
         Args:
             mac (str): MAC文字列
-
         Returns:
             Enum(int)): ステータス（Nofityテーブル内）
         """
@@ -752,7 +729,6 @@ class SQL:
             None  : 更新できない（システムエラー）
             + mess : エラーメッセージ
         """ 
-
         C.logger.debug(f"updateSystemConf({cloud_date})")
         c = self.connection.cursor()
         conf_date = None
@@ -817,7 +793,7 @@ class SQL:
         """
         #C.logger.debug(f"_getSensors()")
         c = self.connection.cursor()
-
+        macs = list()
         try :
             ql = 1 if valid==True else 0
             query = f'SELECT mac FROM conf WHERE use="{ql}"'
@@ -827,13 +803,11 @@ class SQL:
                 # データ有り
                 macs = list()
                 macs += res
-                for mac in c.fetchall() :
-                    macs += mac
-                return macs
-            return None
+                for mac in c.fetchall() : macs += mac
+            return macs
         except sqlite3.Error as e:
             C.logger.error(f"[_getSensors] ERROR : {e}")
-            return None
+            return macs
         
     def _getThreshold( self, mac ) :
         """ センサー閾値の取得
@@ -844,23 +818,22 @@ class SQL:
         """
         #C.logger.debug(f"_getThreshold()")
         c = self.connection.cursor()
-
         try :
             query = f"SELECT warn FROM conf WHERE mac='{mac}'"
             c.execute(query)
             res = c.fetchone()
             if res != None :
                 lC,lW,hW,hC = res[0].split(sep=',')
-                low_caution = None if lC == 'NONE' else float(lC)
-                low_warn = None if lW == 'NONE' else float(lW)
-                high_warn = None if hW == 'NONE' else float(hW)
-                high_caution = None if hC == 'NONE' else float(hC)
+                low_caution = None if lC.upper() == 'NONE' else float(lC)
+                low_warn = None if lW.upper() == 'NONE' else float(lW)
+                high_warn = None if hW.upper() == 'NONE' else float(hW)
+                high_caution = None if hC.upper() == 'NONE' else float(hC)
                 return low_caution,low_warn,high_warn,high_caution
             return None, None, None, None
 
         except sqlite3.Error as e:
             C.logger.error(f"sqlite3 ERROR : {e}")
-            return None
+            return None, None, None, None
     
     def getAmbientInfo( self, node_no ) :
         """ Ambient接続情報を取得
@@ -869,7 +842,7 @@ class SQL:
         Returns:
             dict: 
         """
-        C.logger.debug(f"getAmbientInfo( LORA{node_no:02} )")
+        #C.logger.debug(f"getAmbientInfo( LORA{node_no:02} )")
         c = self.connection.cursor()
         data = {}
         try :
@@ -893,11 +866,11 @@ class SQL:
     def getAmbientIndex(self, mac ) -> str :
         """ 指定したMACのAmbientのData番号を返す
         Args:
-            mac (str): _description_
+            mac (str): センサーMAC
         Returns:
             str: data番号（""未設定）
         """
-        C.logger.debug(f"getAmbientIndex({mac})")
+        #C.logger.debug(f"getAmbientIndex({mac})")
         c = self.connection.cursor()
         try :
             query = f"SELECT ambient_conf FROM conf WHERE mac='{mac}'"
@@ -1071,9 +1044,10 @@ if __name__ == '__main__':
     elif len(args) != 1 and args[1].upper() == "SENSINFO" :
         S = SQL()
         print("SENS Info")
-        for mac in S._getSensors(valid=True) :
-            name, node_name, node_no = S.getSensorInfo(mac)
-            pprint.pprint(f"{mac} -- {name},{node_name},{node_no}")
+        macs = S._getSensors(True)
+        for mac in macs :
+            name, node_name, node_no , warn= S.getSensorInfo(mac)
+            pprint.pprint(f"{mac}-{name},{node_name},{node_no} {warn}")
 
     elif len(args) != 1 and args[1].upper() == "AMBIENT" :
         S = SQL()
@@ -1129,5 +1103,12 @@ if __name__ == '__main__':
         print("num Of Sensors")
         num= S.numSensorsMe()
         print(f"sensors->{num}")
+
+    elif len(args) != 1 and args[1].upper() == "ARRIVE" :
+        S = SQL()
+        print("Arrive Node")
+        for node in range(1, S.numNode()+1) :
+            print(f"NODE:{node} is {S.isArriveNode(node)}")
+
 
     print("libSQL not oprateed.")

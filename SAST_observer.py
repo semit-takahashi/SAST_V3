@@ -226,7 +226,7 @@ def countFromStatus( status:C.SENS_ST , data:dict ) -> int:
     """指定したステータスでカウントを計算
     Args:
         status (IntEnum): センサー状態
-        data (dicyt): notifyから取得したdict
+        data (dict): notifyから取得したdict
     Returns:
         int: カウント値
     """
@@ -275,7 +275,7 @@ def _send_cloud() :
 
     ## ============================================================================================
     #  センサー温度が閾値超えかをチェック
-    C.logger.info(f"Judgement SENS:{len(sensDATAs)}/NOTIFY:{len(notifyListAll)}")
+    C.logger.info(f"Judgement SENS:{len(sensDATAs)} / NOTIFY:{len(notifyListAll)}")
     for n in notifyListAll :
         # センサーデータを検索
         s = _searchSensorData(sensDATAs, n['mac'])
@@ -284,8 +284,7 @@ def _send_cloud() :
             # この状態ではLatestにセンサーが存在している（＝LOSTしていない）
 
             # Node情報なら次にスキップ
-            if s['mac'].startswith('00:00:00') : 
-                continue
+            if s['mac'].startswith('00:00:00') : continue
 
             # 指定したMACの閾値情報を取得
             (lc,lw,hw,hc) = S._getThreshold( s['mac'])
@@ -348,14 +347,14 @@ def _send_cloud() :
     C.logger.info("Notify to discord ...")
     max_node = S.numNode() # ノード数を取得
     for no in range(1, max_node + 1 ) : #ノード数でループ
-        notifyList4Node = S.getNotifyList( no , notify=True )
+        notifyList4Node = S.getNotifyList( no, ClearfNotify=True )
         ## Notify List が存在するか？ 無ければ通知はSKIP 
         if not len(notifyList4Node) == 0 :
             mess = ""
             token = S.getDiscord( no )
             if token == False : continue #tokenが入っていないならスキップ
-            amb_conf = S.getAmbientInfo( no )
-            if amb_conf == None : amb_url = ""  #-- AmbientURLが未設定 
+            if not S.isArriveNode( no ) : continue # Nodeが無い＝死んでいる ならスキップ
+
             C.logger.info(f"notifyList {notifyList4Node}")
             for notify in notifyList4Node :
                 if notify['mac'].startswith('00:00:00') : continue # Node情報ならSKIP
@@ -364,14 +363,21 @@ def _send_cloud() :
                 if notify['count'] >= 10 : continue # 10回以上通知したなら通知無効
 
                 C.logger.info(f"Notify({notify['mac']}) -- {notify['date']} [{C.SENS_ST(notify['status']).name}] ct:{notify['count']}")
-                ( sens_name, node_name, nodeNo ) = S.getSensorInfo(notify['mac'])
-                ( lc, lw, hw, hc ) = S._getThreshold( notify['mac'])
+                ( sens_name, node_name, nodeNo, warn ) = S.getSensorInfo(notify['mac'])
+                #( lc, lw, hw, hc ) = S._getThreshold( notify['mac'])
                 sens = _searchSensorData( sensDATAs, notify['mac'])
                 templ = sens['templ'] if sens != None else 0
-                mess += makeNotifyMessage( sens_name, node_name, notify['status'], templ , hc, hw )
+                mess += makeNotifyMessage( sens_name, node_name, notify['status'], templ , warn['hC'], warn['hW'] )
 
             if mess != "" : ## メッセージが作成されていれば通知
-                POST_discord( mess, token, amb_url )
+                amb_conf = S.getAmbientInfo( no )
+                if amb_conf == None :  # Ambient未指定ならNULLとして通知
+                    POST_discord( mess, token, "" )
+                else :
+                    POST_discord( mess, token,  f"{C.AMB['URL']}{amb_conf['id']}" )
+
+    # 通知処理終了なので、Notifyをクリア
+    #S.clearNotify()
 
     ## ===========================================================================================
     #  Ambient送信
@@ -538,24 +544,23 @@ def _checkBattery() :
         for s in sensors :
             # センサーデータ取得
             try :
-                ( mac, name ) = s
-                ( batt, date, rssi, ext ) = S.getBattery(mac)
-                battery_info['name'] = name
-                battery_info['batt'] = batt
-                C.logger.info(f"{name}:{mac}({date})- {batt}%")
+                bt = S.getBattery(s['mac'])
+                battery_info['name'] = s['name']
+                battery_info['batt'] = bt['batt']
+                C.logger.info(f"{s['name']}:{s['mac']}({bt['date']})- {bt['batt']}%")
             except Exception as e :
-                C.logger.debug(f"No data {mac} ... skikp")
+                C.logger.debug(f"No data {s['mac']} ... skikp")
                 continue
             #情報生成
-            if batt <= 15.0 : 
-                mess += f"{name} : {batt}% 要交換!!\n"
+            if bt['batt'] <= 15.0 : 
+                mess += f"{s['name']} : {bt['batt']}% 要交換!!\n"
             else :
-                mess += f"{name} : {batt}% \n"
+                mess += f"{s['name']} : {bt['batt']}% \n"
         
         #通知メッセージ作成
         if mess == "" : continue # メッセージ無いならスキップ
-        ( no, node_name) = S.getNodeInfo( node )
-        mess = f"{node_name} のバッテリー情報\n" + mess 
+        nodeInfo = S.getNodeInfo( node )
+        mess = f"{nodeInfo['name']} のバッテリー情報\n" + mess 
         
         # DIscord通知
         token = S.getDiscord( node )
