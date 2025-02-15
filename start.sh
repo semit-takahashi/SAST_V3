@@ -29,10 +29,10 @@ cd $EXE_DIR
 $PYTHON $EXE_DIR/libOLED.py STARTUP 
 
 # プロセスKILL
-echo "Kill Python3 Process ... "
-/usr/bin/sudo /usr/bin/killall python3
-echo "done."
-echo ""
+#echo "Kill Python3 Process ... "
+#/usr/bin/sudo /usr/bin/killall python3
+#echo "done."
+#echo ""
 
 # ホスト名取得
 host=$(hostname)

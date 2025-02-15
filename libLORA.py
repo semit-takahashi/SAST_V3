@@ -38,11 +38,7 @@ except:
     C.logger.warning("GPIO not fond, Start MOCK!")
     import Mock.GPIO as GPIO
 
-### -- Lora ADDR
-GATE_ADDR = 0x2310
-GATE_CHANNEL = 0
-BCAST_ADDR = 0xffff
-NODE_CHANNEL = 10
+
 ### -- UART Port
 PORT = '/dev/ttyS0'
 BAUD = 115200
@@ -250,7 +246,7 @@ class Lora_GATE :
     def _send_ack(self, node, channel, seq, ack='A' ) :
         ''' ACK を返送 '''
         payload = bytearray()
-        if self._Lora_Fixed_addr : payload += makeLoraADDR( GATE_ADDR+node, channel)
+        if self._Lora_Fixed_addr : payload += makeLoraADDR( C.GATE_ADDR+node, channel)
         data = struct.pack(L_BEACON, ord(ack), seq, int(time.time()) )
         payload += data
         C.logger.debug(f"ACK:{ack} {payload.hex()}")
@@ -291,18 +287,25 @@ class Lora_GATE :
            # 指定長のデータ受信待ち
             if self._ser.in_waiting != 0 :
                 payload = self._ser.read(length)
-                payload_rssi = self._ser.read(1) # RSSI取得
+                payload_rssi = self._ser.read(1)
+                break
+
             else :
                 time.sleep(0.2)
                 continue
 
-            # データ分解
-            s = struct.calcsize(L_DATA)
-            rssi = int.from_bytes(payload_rssi,'big') - 256
-            datas = [payload[i:i+s] for i in range(0, len(payload), s )]
-            #C.logger.debug(f"Recived datas={datas}")
-            return datas , rssi 
-   
+        # データ前受信したので次に
+        payload_rssi = self._ser.read(1) # RSSI取得 
+
+        C.logger.debug(f"RECV({len(payload)-1}/{length}) {payload.hex()}")
+
+        # データ分解
+        s = struct.calcsize(L_DATA)
+        rssi = int.from_bytes(payload_rssi,'big') - 256
+        datas = [payload[i:i+s] for i in range(0, len(payload), s )]
+        #C.logger.debug(f"Recived datas={datas}")
+        return datas , rssi 
+
     def _beacon_sender(self) :
         ''' 毎分0秒に Beaconを送信 scheduler利用 '''
         C.logger.info(" START Beacon Sender ... ")
@@ -323,7 +326,7 @@ class Lora_GATE :
         for i in range( 1 , BEACON_COUNT+1 ) :
             payload = bytearray()
             if self._Lora_Fixed_addr : 
-                payload += makeLoraADDR( BCAST_ADDR, NODE_CHANNEL)
+                payload += makeLoraADDR( C.BCAST_ADDR, C.NODE_CHANNEL)
             data = struct.pack(L_BEACON, ord('B'), i, int(time.time()) )
             payload += data
             C.logger.debug(f" Beacon :{i} {payload.hex()}")
@@ -392,33 +395,39 @@ class Lora_NODE :
 
     def _send_data(self) :
         ''' Thread起動 LoRa Data Sender '''
-        C.logger.debug("[_send_data] Send Data ... START")
+        MAX_DATA = int((C.SUB_PACKET-5) / struct.calcsize(L_DATA))
+        C.logger.debug(f"[_send_data] Send Data START( MAX {MAX_DATA-1} Sensors )")
         S = SQL() ### Thread用に必須
 
         setMode(0)
         WaitAUX()
         C.logger.info("Lora Module Wakeup... done")
 
+        data_count = 1
         sendDATA = list()
 
         ## NODE本体の情報（MACをNODEにする）
-        node_mac = '00:00:00:00:00:0'+str(self._NodeNo)
+        node_mac = f'00:00:00:00:00:{self._NodeNo:02}'
         templ = M.getMachine_Temp()
         seq = self.getSeq()  
         batt = M.getBatteryPiSugar3()
-        sendDATA.append( data_pack( self._NodeNo, seq, node_mac, int(time.time()), templ, 0.0, batt, 0, 0 ) )
+        volt = M.getVoltagePiSugar3()
+        chrg = M.isChargePiSuger3()
+        sendDATA.append( data_pack( self._NodeNo, seq, node_mac, int(time.time()), templ, volt, batt, 0, chrg ) )
 
         ## センサーの情報をSQLから取得
         sensorDATA = S.getLatestDATA(NODE_NO, delete=True)
         C.logger.debug(f"Sensor is ({len(sensorDATA)})")
         for s in sensorDATA :
+            data_count += 1
+            if data_count > MAX_DATA : break  # -- サブパケットを超えた分は送信できない
             s['status'] = S.getStatus( s['mac'] )
             C.logger.debug(f"SENSOR : {s}")
             sendDATA.append( data_pack( self._NodeNo, seq, s['mac'], C.toTimespan(s['date']), s['templ'], s['humid'], s['batt'], s['rssi'], s['status'] ))
         
         #C.logger.debug(f"sendDATA : {sendDATA}")
         ## 1つのデータにパッキング
-        stream = makeSendDataStream( GATE_ADDR, GATE_CHANNEL, sendDATA)
+        stream = makeSendDataStream( C.GATE_ADDR, C.GATE_CHANNEL, sendDATA)
         C.logger.debug(f" SEND({len(stream)})> {stream.hex()}")
 
         ## データの送信
@@ -607,8 +616,8 @@ def data_pack( node, seq, mac, times:int, templ, humid, batt, rssi, status ) :
     humid_s = int(humid * 10)
     batt_s = int(batt * 10)
     mac_s = MAC_encode(mac)
-    data = struct.pack( L_DATA , node, NODE_CHANNEL, seq, mac_s, times, templ_s, humid_s, batt_s, rssi, status)
-    #print(f"{node} {NODE_CHANNEL} {seq} {mac} {times} {templ_s} {humid_s} {batt_s} {rssi} {status} -> \n{data} len={len(data)}")
+    data = struct.pack( L_DATA , node, C.NODE_CHANNEL, seq, mac_s, times, templ_s, humid_s, batt_s, rssi, status)
+    #print(f"{node} {C.NODE_CHANNEL} {seq} {mac} {times} {templ_s} {humid_s} {batt_s} {rssi} {status} -> \n{data} len={len(data)}")
     return data
 
 def data_unpack( data:bytes ) :
@@ -670,7 +679,7 @@ def makeSendDataStream ( addr, channnel, data : list )  -> bytearray :
     # データ連結
     stream += (struct.pack(L_LEN, size))
     stream += buff
-    C.logger.debug(f" LEN>{size}")
+    C.logger.debug(f"[makeSendDataStream] L_LEN({size} / DATA({len(data)} @ {struct.calcsize(L_DATA)})")
 
     return stream
 
@@ -696,7 +705,9 @@ if __name__ == "__main__" :
                 C.logger.critical(f"ERROR This Machine NODE - {M.getHostname()}")
                 sys.exit(0)
             C.logger.info(f"--- GATEWAY --- {NODE_NO:02}")
+            C.logger.info(f"ADDR:{C.GATE_ADDR:#x}-{C.GATE_CHANNEL:02}")
             print("lilbLoRa.py -- START for GATE")
+            print(f"ADDR:{C.GATE_ADDR:#x}-{C.GATE_CHANNEL:02}")
 
             ## E220 LoRa Module init
             setMode(0)
@@ -715,11 +726,13 @@ if __name__ == "__main__" :
                 C.logger.critical(f"ERROR!!! This HOST is GATEWAY - {M.getHostname()}")
                 sys.exit(0)
             C.logger.info(f"--- NODE -- {NODE_NO:02}")
+            C.logger.info(f"ADDR:{(C.GATE_ADDR+NODE_NO):#x}-{C.NODE_CHANNEL:02}")
             print(f"lilbLoRa.py -- START for NODE{NODE_NO:02}")
+            print(f"ADDR:{(C.GATE_ADDR+NODE_NO):#x}-{C.NODE_CHANNEL:02}")
 
             ## E220 LoRa Module init
-            #setMode(0)
-            #WaitAUX()
+            setMode(0)
+            WaitAUX()
 
             ## START UP Lora Thread
             NODE = Lora_NODE(NODE_NO)
@@ -731,10 +744,6 @@ if __name__ == "__main__" :
         elif args[1].upper() == 'AUX' :
             mode = 'HIGH' if GPIO.input(AUX_PIN) == 1 else 'LOW'
             C.logger.info(f"AUX pin is {mode}")
-            sys.exit(0)
-
-        elif args[1].upper() == 'ADDR' :
-            print(  makeLoraADDR( GATE_ADDR, GATE_CHANNEL) )
             sys.exit(0)
 
     except KeyboardInterrupt :

@@ -6,6 +6,13 @@ import time
 import argparse
 import configparser
 import os,sys
+try :
+    import sys
+    sys.path.append('../')
+    import  config as C
+except ImportError :
+    print("ERROR : NotFound congig.py")
+    sys.exit(1)
 
 PORT='/dev/ttyS0'
 BAUD=9600
@@ -289,7 +296,6 @@ def main():
             command = [0xC0, 0x00, 0x08]
 
             # 設定ファイルから読み込み
-            own_address = inifile.get("E220-900JP", "own_address")
             baud_rate = inifile.get("E220-900JP", "baud_rate")
             bw = inifile.get("E220-900JP", "bw")
             sf = inifile.get("E220-900JP", "sf")
@@ -298,7 +304,6 @@ def main():
                 "E220-900JP", "rssi_ambient_noise_flag"
             )
             transmitting_power = inifile.get("E220-900JP", "transmitting_power")
-            own_channel = inifile.get("E220-900JP", "own_channel")
             rssi_byte_flag = inifile.get("E220-900JP", "rssi_byte_flag")
             transmission_method_type = inifile.get(
                 "E220-900JP", "transmission_method_type"
@@ -308,11 +313,15 @@ def main():
 
             # Address 00H, 01H
             # own_address
+            own_address = C.GATE_ADDR
             own_address = int(own_address,16)   
             # --- change HOST ID
             node = getNodeNO()
             if node != 0: 
+                own_channel = C.NODE_CHANNEL
                 own_address += node
+            else :
+                own_channel = C.GATE_CHANNEL
 
             ADDH = own_address >> 8
             ADDL = own_address & 0b1111_1111

@@ -39,7 +39,10 @@ def _existI2CDevice(address):
     return ret
 
 def isChargePiSuger3() :
-    """ PiSugar3で充電中なのかを認識 True/False"""
+    """ PiSugar3で充電中なのかを認識 
+    Retuens:
+            True/False
+    """
     charge = False
     try:
         bus = smbus2.SMBus(I2C_BUS)
@@ -55,12 +58,14 @@ def isChargePiSuger3() :
         return charge
    
 
-def getBatteryPiSugar3() :
+def getBatteryPiSugar3() -> int : 
     """ PiSugar3 のI2Cレジスタ(0x57）からバッテリー容量を返す
         I2Cが無い場合やアクセス不可の場合は-1を返す
         2025/01/30修正
         RTCの一部製品でEEPROMがある製品は、正しく値が返ってくる。
         この場合、0xffが戻り値なら-1を返す。
+    Returns:
+        int : バッテリー%
     """
     try:
         bus = smbus2.SMBus(I2C_BUS)
@@ -75,21 +80,25 @@ def getBatteryPiSugar3() :
         bus.close()
         return level
 
+def getVoltagePiSugar3() -> float :
+    """ PiSugar3から電池電圧を取得
+    Returns:
+        float : 電池電圧
+    """
+    level = 0.0
+    try:
+        bus = smbus2.SMBus(I2C_BUS)
+        vH = bus.read_byte_data(I2C_PiSugar_REG, 0x22)
+        vL = bus.read_byte_data(I2C_PiSugar_REG, 0x23)
+        level = ( (vH << 8) + vL ) / 1000
 
-'''
-def getBatteryPiSugar() :
-    """ PiDugar3のパッテリー容量を検出"""
-    if _existI2Cevice(I2C_PiSugar) : 
-        import pisugar as PS
-        try :
-            conn, event_conn = PS.connect_tcp('raspberrypi.local')
-            s = PS.PiSugarServer(conn, event_conn)
-            return s.get_battery_level()
-        except Exception as e :
-            return -1
-    else :
-        return -1
-'''
+    except Exception as e:
+        #C.logger.warning(f"No DATA from {I2C_PiSugar_REG} addr.")
+        level = -1
+    
+    finally:
+        bus.close()
+        return level
 
 def isRootUser() :
     """プロセス起動ユーザがroot?
@@ -118,7 +127,6 @@ def sendSIG4Monitor():
 
 def getHostname():
     """ホスト名を返す
-
     Returns:
         str: ホスト名
     """
@@ -127,7 +135,6 @@ def getHostname():
 def getNodeNo() :
     """ノードNoを返す
     ホスト名の下2桁がNodeNo 0はGATEWAY
-
     Returns:
         int : ノードNO0
     """
@@ -136,32 +143,36 @@ def getNodeNo() :
 
 def getIPAddr( iface = 'wlan0', subnet=False ):
     """IPv4アドレスを返す
-
     Args:
         iface (str, optional): インタフェース. 初期値 'wlan0'.
-        subnet (bool, optional): サブネットを付けるか？. 初期値 False.
-
+        subnet (bool, optional): サブネットを付けるか？ 初期値 False.
     Returns:
         str: IPアドレス文字列
     """
-    try :
-        ip = ipget.ipget()
-        if ip == '' :
-            return '0.0.0.0'
-        if subnet :
-            return ip.ipaddr( iface )
-        return ip.ipaddr(iface).split('/')[0]
+    count = 0
+    while True :
+        if count > 10 : break
+        try :
+            ip = ipget.ipget()
+            if ip == None : 
+                count += 1
+                time.sleep(1.0)
+                continue
+            if subnet :
+                return ip.ipaddr( iface )
+            return ip.ipaddr(iface).split('/')[0]
 
-    except ValueError as e :
-        C.logger.warning(f"getIPAddr  : {e}")
-        return '0.0.0.0'
+        except ValueError as e :
+            C.logger.warning(f"getIPAddr  : {e}")
+            count += 1
+            time.sleep(1.0)
+            continue
+    return None
 
 def getIPAddrV6( iface = 'wlan0' ):
     """IPv6アドレスを返す
-
     Args:
         iface (str, optional): インタフェース. 初期値 'wlan0'.
-
     Returns:
         str: IPアドレス文字列
     """
@@ -170,10 +181,8 @@ def getIPAddrV6( iface = 'wlan0' ):
 
 def getMACAdr( iface='wlan0' ) :
     """MACアドレスを返す
-
     Args:
         iface (str, optional): インタフェース. 初期値 'wlan0'.
-
     Returns:
         str: MACアドレス文字列
     """
@@ -182,10 +191,8 @@ def getMACAdr( iface='wlan0' ) :
 
 def getTypeIP(IP):
     """指定したIPv4のアドレスタイプを返す
-
     Args:
         IP (str): IPアドレス文字列
-
     Returns:
         str: None:なし, InPriv:InPrivate,Private:プライベート,Global:グローバル
     """
@@ -197,18 +204,15 @@ def getTypeIP(IP):
     return "Global"
 
 def resetDHCP():
-    """DCHPをリセットして再割り当て
-
-    """
+    """DCHPをリセットして再割り当て """
     subprocess.check_output(['/sbin/dhclient','-r'], shell=True)
     time.sleep(5)
     subprocess.check_output(['/sbin/dhclient'], shell=True)
     time.sleep(1)
-    print("IP = {getIPAddr()}")
+    C.logger.warning(f"resetDHCP done  IP = {getIPAddr()}")
 
 def getDefaultRoute():
     """デフォルトルータアドレスを返す
-
     Returns:
          str: デフォルトルータのIP
     """
@@ -219,23 +223,19 @@ def getDefaultRoute():
 
 def IsAlive(IPAddr):
     """指定したIPのPin応答があるか？
-
     Args:
         IPAddr (str): IPアドレス文字列
-
     Returns:
         bool: 
     """
-    cmd = f"/bin/ping -c 3 {IPAddr} "
-    ret = subprocess.run(['/bin/ping','-c','2',IPAddr],stdout=subprocess.DEVNULL)
+    #cmd = f"/bin/ping -c 3 {IPAddr} "
+    ret = subprocess.run(['/bin/ping','-c','3',IPAddr],stdout=subprocess.DEVNULL)
     #ret = subprocess.run(f"[{cmd):")
     #print(ret)
-    if( ret.returncode == 0 ): return True
-    return False
+    return True if( ret.returncode == 0 ) else False
 
 def getSSID():
     """wlan0が接続しているSSIDを返す
-
     Returns:
         str: SSID文字列
     """
@@ -350,6 +350,9 @@ if __name__ == '__main__':
     print(f"PiSugar: {_existI2CDevice(I2C_PiSugar)}")
     print(f"PuSugar3 Power Connect? : {isChargePiSuger3()}")
     print(f"PiSugar3 Battery Level : {getBatteryPiSugar3()}")
+    print(f"PiSugar3 Voltage Level : {getVoltagePiSugar3()}")
     
-
     print(f"IsRoot : {isRootUser()}")
+
+    print("libMachine debug done.")
+    

@@ -168,15 +168,15 @@ def sent_Ambient( amb_conf, sendDATA ):
             C.logger.info(f"Send Ambient(ch:{channel}) ... ")
             ret = am.send(sendDATA)
             if ret.status_code == 200 :
-                C.logger.info(f"Response({ret.status_code}) done")
+                C.logger.info(f"[Ambient] Response({ret.status_code}) done")
                 return True
             elif ret.status_code == 403 :
-                C.logger.warning(f"Response({ret.status_code}) wait 3 sec")
+                C.logger.warning(f"[Ambient] Response({ret.status_code}) wait 3 sec")
                 time.sleep(3)
                 continue
 
             else :
-                C.logger.warning(f"Response({ret.status_code}) ")
+                C.logger.warning(f"[Ambient] Response({ret.status_code}) ")
                 time.sleep(0.2)
                 return False
 
@@ -206,10 +206,10 @@ def sent_GAS( GAS, sendDATA):
         try:
             ret = requests.post(GAS, data=json.dumps(sendDATA), headers={'Content-Type': 'application/json'})
             if ret.status_code == 200 :
-                C.logger.info(f"Response({ret.status_code}) time={time.time() - past :5.2}sec")
+                C.logger.info(f"[GAS] Response({ret.status_code}) time={time.time() - past :5.2}sec")
                 return True
             else :
-                C.logger.warning(f"Response({ret.status_code}) time={time.time() - past :5.2}sec")
+                C.logger.warning(f"[GAS] Response({ret.status_code}) time={time.time() - past :5.2}sec")
                 return False
 
         except requests.exceptions.RequestException as e:
@@ -326,7 +326,7 @@ def _send_cloud() :
                 C.logger.debug(f"{n['mac']} -- Not Connected ... SKIP")
                 continue 
 
-            C.logger.debug(f"L: {n['mac']} - {n['date']}/{C.SENS_ST(n['status']).name}/{n['count']}")
+            C.logger.debug(f"LOST? {n['mac']} - {n['date']}/{C.SENS_ST(n['status']).name}/{n['count']}")
             ## 一度接続したことがあるセンサーなので、LOST疑いあり
             if PassedMinute( n['date'], minute=15 ) and n['status'] == C.SENS_ST.NORMAL :
                 # 15分経過かつロストしていない場合は−＞初期のロスト
@@ -375,9 +375,6 @@ def _send_cloud() :
                     POST_discord( mess, token, "" )
                 else :
                     POST_discord( mess, token,  f"{C.AMB['URL']}{amb_conf['id']}" )
-
-    # 通知処理終了なので、Notifyをクリア
-    #S.clearNotify()
 
     ## ===========================================================================================
     #  Ambient送信
@@ -438,7 +435,6 @@ def _searchSensorData( sensDATAs , mac ) :
     for s in sensDATAs :
         if s['mac'] == mac : return s
     return None
-
 
 
 def _getSetting4GApps( verbose=False ) :
@@ -544,23 +540,24 @@ def _checkBattery() :
         for s in sensors :
             # センサーデータ取得
             try :
-                bt = S.getBattery(s['mac'])
-                battery_info['name'] = s['name']
-                battery_info['batt'] = bt['batt']
-                C.logger.info(f"{s['name']}:{s['mac']}({bt['date']})- {bt['batt']}%")
+                ( mac, name ) = s
+                ( batt, date, rssi, ext ) = S.getBattery(mac)
+                battery_info['name'] = name
+                battery_info['batt'] = batt
+                C.logger.info(f"{name}:{mac}({date})- {batt}%")
             except Exception as e :
-                C.logger.debug(f"No data {s['mac']} ... skikp")
+                C.logger.debug(f"No data {mac} ... skikp")
                 continue
             #情報生成
-            if bt['batt'] <= 15.0 : 
-                mess += f"{s['name']} : {bt['batt']}% 要交換!!\n"
+            if batt <= 15.0 : 
+                mess += f"{name} : {batt}% 要交換!!\n"
             else :
-                mess += f"{s['name']} : {bt['batt']}% \n"
+                mess += f"{name} : {batt}% \n"
         
         #通知メッセージ作成
         if mess == "" : continue # メッセージ無いならスキップ
-        nodeInfo = S.getNodeInfo( node )
-        mess = f"{nodeInfo['name']} のバッテリー情報\n" + mess 
+        ( no, node_name) = S.getNodeInfo( node )
+        mess = f"{node_name} のバッテリー情報\n" + mess 
         
         # DIscord通知
         token = S.getDiscord( node )
@@ -590,6 +587,11 @@ if __name__ == '__main__' :
         else :
             print(f"No need Update. {time.time() - start:.2f}sec")
         sys.exit()     
+
+    elif len(args) != 1 and args[1].upper() == "BATTERY" :
+        C.logger.info("Notify Sensor BatteryInfo ")
+        _checkBattery()
+        sys.exit(0)
 
     ### UNIX Signal Register
     signal.signal(signal.SIGTERM, _intr_term)

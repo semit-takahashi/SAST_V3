@@ -9,6 +9,11 @@ Ver. 1.0.0 2023/03/21
 Ver. 2.0.1 2025/01/20 
 Auther F.Takahashi
 """
+### -- Lora ADDR
+GATE_ADDR = 0x2310
+GATE_CHANNEL = 0
+BCAST_ADDR = 0xffff
+NODE_CHANNEL = 10
 
 ### TIME Settings
 ## GATE
@@ -17,10 +22,11 @@ SPAN_CONFIG_UPDATE = 1  #hour
 SPAN_BEACON = 60        #sec
 ## NODE
 SPAN_SENSOR = 60        #sec
+SUB_PACKET = 200       #byte of 1 send(Lora Subpacket bytes)
 
 ## SENSOR Vaild MAC Addr 
 #  -- write small charactor
-VaildMACs = ['49:22:01','49:22:05','49:21:08','49:23:09']
+VaildMACs = ['49:22:01','49:22:05','49:21:08','49:23:09','64:69:4e', '10:08:2c']
 
 # GAS setting　GAT_setting.py 参照
 #GAS = {

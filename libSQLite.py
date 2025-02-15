@@ -516,7 +516,7 @@ class SQL:
         try :
             c = self.connection.cursor()
             date = C.getTimeSTR()
-            notify = 1 if state == C.SENS_ST.NORMAL else 1
+            notify = 0 if state == C.SENS_ST.NORMAL else 1
             query = f"UPDATE notify SET date='{date}', status={state}, notify={notify}, count={count} WHERE mac='{mac}'"
             #print(query)
             c.execute(query)
