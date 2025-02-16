@@ -6,7 +6,7 @@ DEST_PATH="/home/${DEST_USER}/${SAST_DIR}"
 CURRENT=`pwd`
 
 SRC_PATH=""
-SRC_FILES="start.sh lib*.py config.py SAST_[a-z]*.py setup_bashrc.sh sast.service"
+SRC_FILES="start.sh lib*.py config.py SAST_[a-z]*.py setup_bashrc.sh sast.service "
 DBS_FILES="sql_sastv3.sqlite"
 
 SET_PATH="settings"
@@ -62,7 +62,6 @@ sudo pip3 install Adafruit_SSD1306 Pillow ipget pyserial schedule
 sudo pip3 install git+https://github.com/AmbientDataInc/ambient-python-lib.git 
 sudo pip3 install wiringpi psutil schedule ipget bluepy smbus2
 
-
 3. add user Permissions
 bluepy-helper eg. python3 - bluepy 1.3.0 
 >
@@ -77,28 +76,30 @@ sudo mv -f settings/GAS_setting.py /boot
 5. Bluetooth ＆ Serial Console Stting
 > add script /boot/config.txt
 dtparam=i2c_arm=on
-dtoverlay=i2c-rtc,ds3231,dwc2
+dtoverlay=i2c-rtc,ds1307,dwc2
 enable_uart=1
 
-> add text /boot/cmndline.txt
+> add text /boot/cmndline.txt for GATEWAY
 
 5. crontab -e and Add startup Script
 @reboot /bin/bash /home/${DEST_USER}/${SAST_DIR}/start.sh
 
-6. edit Rsyslogd.conf
+or 2in1 GATEWAY Model to systemctrl 
+$ cd /etc/systemd/system/
+$ sudo ln -s /home/sast/SAST_V301/sast.service .
+$ sudo systemctl enable sast.service
+
+
+6. edit Rsyslogd.conf / logrotaate.d/rsyslog
 sudo vi /etc/rsyslogd.conf
->
+> add
 local1*.      -/var/log/SAST.log
 
+sudo vi /etc/logrotate.d/rsyslog
+> add
+/var/log/sast.log
 
-4. execute Raspi-Config
-2.Interface
- -> I2C Enable
- -> Serial Enable  NO->YES -> Reboot
-
-reboot after
-
-6.RTC clock Enable
+7.RTC clock Enable
 sudo hwclock -w --verbose
 
 7. SQLIte3 Library Initialize

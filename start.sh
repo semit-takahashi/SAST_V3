@@ -51,7 +51,7 @@ if [ $node == "00" ]; then
 	echo "Type Gateway"
 	echo "Type Gateway"  >> stderr.log
   	$PYTHON $EXE_DIR/libOLED.py STARTUP "Waiting for" "Connection..." 2>> stderr.log
-	while ! ping -c 1 google.com > /dev/null; do
+	while ! ping -4 -c 3 google.com > /dev/null; do
 		echo "Waiting for network connection..."  >> stderr.log
 		sleep 2
 	done

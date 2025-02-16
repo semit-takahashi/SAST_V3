@@ -287,7 +287,6 @@ class Lora_GATE :
            # 指定長のデータ受信待ち
             if self._ser.in_waiting != 0 :
                 payload = self._ser.read(length)
-                payload_rssi = self._ser.read(1)
                 break
 
             else :

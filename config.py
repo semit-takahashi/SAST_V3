@@ -7,6 +7,7 @@ SEMI-IT Agriculture Support TOOLs [E220-900T22(JP)] LoRa Library
 バージョン情報 -------------------------
 Ver. 1.0.0 2023/03/21
 Ver. 2.0.1 2025/01/20 
+Ver. 2.1.0 2025/02/16 Lora設定を移植（システム毎にアドレスを変える）
 Auther F.Takahashi
 """
 ### -- Lora ADDR
@@ -26,17 +27,13 @@ SUB_PACKET = 200       #byte of 1 send(Lora Subpacket bytes)
 
 ## SENSOR Vaild MAC Addr 
 #  -- write small charactor
-VaildMACs = ['49:22:01','49:22:05','49:21:08','49:23:09','64:69:4e', '10:08:2c']
+VaildMACs = ['49:22:01','49:22:05','49:21:08','49:23:09','64:69:4e','10:08:2c']
 
-# GAS setting　GAT_setting.py 参照
-#GAS = {
-#'URL':'https://script.google.com/macros/s/AKfycbw3MOpC9yLOdKagohiN_QCjGocWtPlRibTUtKa96Dy3_FuWzC__PShKxnnVYuu7-_kW8w/exec'
-#}
+# GAS setting　
+# /boot/GAT_setting.py 参照
 
 ###### Ambient Board URL
-AMB = {
-'URL':"https://ambidata.io/bd/board.html?id="    
-}
+AMB = {'URL':"https://ambidata.io/bd/board.html?id="}
 
 ###### Non Data send to Ambient
 AMB_SEND_NODATA = False
@@ -196,4 +193,5 @@ try :
     GAS = URL
 except ImportError :
     logger.error("/boot/GAS_setting.py Not Found")
+    sys.exit(1)
     pass

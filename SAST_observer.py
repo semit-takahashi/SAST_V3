@@ -38,6 +38,15 @@ import sys
 import signal
 import schedule
 
+
+###### Change IPv4,IPv6
+import socket
+import requests.packages.urllib3.util.connection as urllib3_cn
+def allowed_gai_family(): return socket.AF_UNSPEC  
+def allowed_gai_family4(): return socket.AF_INET  
+def allowed_gai_family6(): return socket.AF_INET6
+urllib3_cn.allowed_gai_family = allowed_gai_family
+
 ###### SIGTERM 
 def intr_signal_term(num,frame):
     C.logging.info("[SAST_observer] catch SIGTERM")
@@ -443,6 +452,7 @@ def _getSetting4GApps( verbose=False ) :
     start=time.time()
     header = {"content-type": "application/json"}
     try :
+        urllib3_cn.allowed_gai_family = allowed_gai_family4
         res = requests.get(f"{C.GAS}?sens=sensor", headers=header)
     except Exception as e :
         C.logger.error(f"[observer] HTTP Connection Error : {e} .... SKIP")
