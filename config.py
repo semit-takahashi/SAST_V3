@@ -27,7 +27,13 @@ SUB_PACKET = 200       #byte of 1 send(Lora Subpacket bytes)
 
 ## SENSOR Vaild MAC Addr 
 #  -- write small charactor
-VaildMACs = ['49:22:01','49:22:05','49:21:08','49:23:09','64:69:4e','10:08:2c']
+VaildMACs = ['49:24:11',
+             '49:22:01',
+             '49:22:05',
+             '49:21:08',
+             '49:23:09',
+             '64:69:4e',
+             '10:08:2c']
 
 # GAS setting　
 # /boot/GAT_setting.py 参照
@@ -181,6 +187,7 @@ class NODE_STAT(IntEnum):
     CAUTION = 5,
     WARN = 6,
     LOST = 7,
+    NO_ACK = 8,
 
 
 # GAS setting　GAT_setting.py 参照

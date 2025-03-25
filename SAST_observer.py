@@ -206,14 +206,16 @@ def sent_GAS( GAS, sendDATA):
         GAS (str): GASのWEB-API
         sendDATA (str): 送信データ（）
     Returns:
-        _type_: _description_
+        bool: 成功/失敗
+
+    10秒タイムアウトなので３リトライで終了
     """
     #sendDATA['date'] = C.toTimespan(sendDATA['date'])
     past = time.time()
     for retry in range(3):
         # 3秒間隔で3回リトライ
         try:
-            ret = requests.post(GAS, data=json.dumps(sendDATA), headers={'Content-Type': 'application/json'})
+            ret = requests.post(GAS, data=json.dumps(sendDATA), headers={'Content-Type': 'application/json'}, timeout=10)
             if ret.status_code == 200 :
                 C.logger.info(f"[GAS] Response({ret.status_code}) time={time.time() - past :5.2}sec")
                 return True
@@ -223,9 +225,14 @@ def sent_GAS( GAS, sendDATA):
 
         except requests.exceptions.RequestException as e:
             C.logger.error(f"[sent_GAS] request failed : {e}")
+            return False
+
+        except requests.exceptions.Timeout as e:
+            C.logger.error(f"[sent_GAS] request timeout : {e} -- retry")
 
         except Exception as e:
             C.logger.error(f"[sent_GAS] Exception:{e}")
+            return False
 
         time.sleep(3)
 

@@ -925,6 +925,25 @@ class SQL:
             C.logger.error(f"[getNodeNo] ERROR: {e}")
             return -1
 
+    def getGoogleURL( self ) -> str:
+        """ GoogleSpreadSheetが設定されていれは返す
+
+        Returns:
+            str: URL
+        """
+        c = self.connection.cursor()
+        try :
+            query = f"SELECT memo FROM conf WHERE name='GATEWAY'"
+            c.execute(query)
+            res = c.fetchone()
+            if res != None :
+                return res[0]
+            return ""
+
+        except sqlite3.Error as e:
+            C.logger.error(f"[getNodeNo] ERROR: {e}")
+            return ""
+
 
 # -----------------------------------------------------------------------------
 
@@ -1056,6 +1075,24 @@ if __name__ == '__main__':
         for no in range( 1, num+1) :
             amb = S.getAmbientInfo(no)
             pprint.pprint(f"LORA{no:02} -- {amb}")
+  
+    elif len(args) != 1 and args[1].upper() == "AMBIENT_URL" :
+        S = SQL()
+        num = S.numNode()
+        for no in range( 1, num+1) :
+            amb = S.getAmbientInfo(no)
+            print(f"https://ambidata.io/bd/board.html?id={amb['id']}")
+        sys.exit(1)
+
+    elif len(args) != 1 and args[1].upper() == "GAS_URL" :
+        print(C.GAS)
+        sys.exit(1)
+
+    elif len(args) != 1 and args[1].upper() == "GOOGLE_URL" :
+        S = SQL()
+        print(S.getGoogleURL())
+        sys.exit(1)
+
 
     elif len(args) != 1 and args[1].upper() == "DISCORD" :
         S = SQL()

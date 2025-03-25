@@ -447,8 +447,10 @@ class Lora_NODE :
         ret, timeL = self._wait_ack( seq )
         if ret == RESCODE.ACK :
             C.logger.info("recv: ACK ")
+            S.changeNodeStatus(C.NODE_STAT.GOOD)
         else :
             C.logger.error(f"recv: {ret}")
+            S.changeNodeStatus(C.NODE_STAT.NO_ACK)
 
         ## LoRa Module DeepSleep
         setMode(3)
@@ -653,7 +655,7 @@ def MAC_encode( mac:str ) :
 
 def makeLoraADDR( addr, channel ) :
     ''' 固定アドレス送信時にアドレスデータを作成 addr, channelは16進'''
-    C.logger.debug(f"LORA_ADDR: 0x{addr:04x} - 0x{channel:04x}")
+    C.logger.debug(f"LORA_ADDR: 0x{addr:04x} - 0x{channel:02x}")
     t_addr = int(addr)
     t_addr_H = t_addr >> 8
     t_addr_L = t_addr & 0xFF

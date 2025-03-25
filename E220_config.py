@@ -314,7 +314,7 @@ def main():
             # Address 00H, 01H
             # own_address
             own_address = C.GATE_ADDR
-            own_address = int(own_address,16)   
+            #own_address = int(own_address,16)   
             # --- change HOST ID
             node = getNodeNO()
             if node != 0: 
