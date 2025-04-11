@@ -33,8 +33,7 @@ class SQL:
     connection = None
 
     def __init__(self,mode=""):
-        self.connection = sqlite3.connect(DB_PATH)
-        #self.connection.isolation_level = None
+        self.connection = sqlite3.connect(DB_PATH,isolation_level="IMMEDIATE")
         if mode != "" : self.createTables( mode )
 
     def createTables(self, mode="") :
@@ -451,7 +450,7 @@ class SQL:
         c = self.connection.cursor()
         try :
             # トランザクションスタート
-            c.execute('BEGIN')
+            c.execute('BEGIN TRANSACTION;')
 
             # NotifyTable更新
             ValidMACs = self._getSensors(valid=True) #TRUEのMACのみ抽出
@@ -555,7 +554,7 @@ class SQL:
         try:
             if ClearfNotify :
                 # 通知有りは更新あるのでトランザクション処理
-                c.execute("BEGIN")
+                c.execute('BEGIN TRANSACTION;')
 
             c.execute(query)
             results = c.fetchall()
@@ -639,7 +638,7 @@ class SQL:
         try:
             # トランザクションを開始
             if delete : # データの削除
-                c.execute('BEGIN')
+                c.execute('BEGIN TRANSACTION;')
 
             c.execute(query)
             results = c.fetchall()
@@ -675,7 +674,7 @@ class SQL:
         try :
             # トランザクションを開始
             if delete :
-                c.execute('BEGIN')
+                c.execute('BEGIN TRANSACTION')
             # センサーデータの取得
             c.execute(f"select L.mac,L.date,L.node,L.templ,L.humid,L.batt,L.rssi,L.ext,L.light,L.status,C.ambient_conf from latest as L inner join conf as C on (L.mac=C.mac);")
             results = c.fetchall()
@@ -755,7 +754,7 @@ class SQL:
             placeholder = ':'+', :'.join(data[0].keys())
 
             # トランザクション開始
-            c.execute('BEGIN TRANSACTION;')
+            c.execute("BEGIN TRANSACTION;")
 
             # 既存データの削除
             sql = "DELETE from conf"
@@ -768,7 +767,7 @@ class SQL:
                 c.execute(sql, d )
  
             # 更新日付の更新
-            sql=f"REPLACE INTO conf_date(id, date) VALUES(1, '{cloud_date}')"
+            sql = f"REPLACE INTO conf_date(id, date) VALUES(1, '{cloud_date}')"
             c.execute(sql)
             c.connection.commit()
 
@@ -851,12 +850,13 @@ class SQL:
             res = c.fetchone()
             if res != None :
                 #print(res[0])
+                if len(res[0]) == 0 : return None
                 data = json.loads(res[0])
                 #C.logger.debug(f"NODE:{node_no}>{data}")
                 return data
             return None
         except json.JSONDecodeError as e:
-            C.logger.error(f"[getAmbientInfo] ERROR: {e}")
+            C.logger.warning(f"[getAmbientInfo] JSONDecodeError : {e}")
             return None
 
         except sqlite3.Error as e:

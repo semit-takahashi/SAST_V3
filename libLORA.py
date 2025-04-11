@@ -579,9 +579,24 @@ class Lora_NODE :
                 recv_datetime = datetime.datetime.fromtimestamp(recv_date)
                 diffTime = datetime.datetime.now() - recv_datetime
                 C.logger.debug(f"Recive({chr(code)}) date:{recv_datetime} diff:{diffTime.seconds} rssi:{rssi}")
+
                 if datetime.timedelta(seconds=10) < diffTime :
                     C.logger.error("SystemTime difference with the GATEWAY is more than 10 seconds!!")
+                    # -- DateTime adjust 
+                    import subprocess
+                    command = f"sudo date --set \"{recv_datetime.year:04}-{recv_datetime.month:02}-{recv_datetime.date:02} {recv_datetime.hour:02}:{recv_datetime.minute:02}:{recv_datetime.second:02}\""
+                    C.logger.debug(command)
+                    process = subprocess.Popen(command,shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    output, error = process.communicate()
+                    if process.returncode == 0:
+                        C.logger.info(f"date Command done . {output.decode()}")
+                    else:
+                        C.logger.error(f"date Commane Error Occored : {error.decode()}")
+
                     self._TimeSkew = True
+                else :
+                    self._TimeSkew = False
+
                 return ( chr(code), seq, recv_datetime, rssi ) 
 
             time.sleep(1.0)

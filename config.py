@@ -199,6 +199,7 @@ try :
     from GAS_setting import URL
     GAS = URL
 except ImportError :
+    print("/boot/GAS_setting.py Not Found")
     logger.error("/boot/GAS_setting.py Not Found")
-    sys.exit(1)
+    sys.exit(-1)
     pass

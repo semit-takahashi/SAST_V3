@@ -215,7 +215,7 @@ def sent_GAS( GAS, sendDATA):
     for retry in range(3):
         # 3秒間隔で3回リトライ
         try:
-            ret = requests.post(GAS, data=json.dumps(sendDATA), headers={'Content-Type': 'application/json'}, timeout=10)
+            ret = requests.post(GAS, data=json.dumps(sendDATA), headers={'Content-Type': 'application/json'}, timeout=15)
             if ret.status_code == 200 :
                 C.logger.info(f"[GAS] Response({ret.status_code}) time={time.time() - past :5.2}sec")
                 return True
@@ -228,7 +228,7 @@ def sent_GAS( GAS, sendDATA):
             return False
 
         except requests.exceptions.Timeout as e:
-            C.logger.error(f"[sent_GAS] request timeout : {e} -- retry")
+            C.logger.error(f"[sent_GAS] request timeout : {e}")
 
         except Exception as e:
             C.logger.error(f"[sent_GAS] Exception:{e}")
@@ -460,7 +460,12 @@ def _getSetting4GApps( verbose=False ) :
     header = {"content-type": "application/json"}
     try :
         urllib3_cn.allowed_gai_family = allowed_gai_family4
-        res = requests.get(f"{C.GAS}?sens=sensor", headers=header)
+        res = requests.get(f"{C.GAS}?sens=sensor", headers=header, timeout=15)
+
+    except requests.exceptions.Timeout as e:
+        C.logger.error(f"[observer] GAS request timeout : {e} -- skip")
+        return False
+
     except Exception as e :
         C.logger.error(f"[observer] HTTP Connection Error : {e} .... SKIP")
         return False
@@ -491,7 +496,7 @@ def _getSetting4GApps( verbose=False ) :
         
 
         if ret :
-            C.logger.info(f"Update done. {time.time() - start:.2f}sec")
+            C.logger.info(f"Update done. {time.time() - start:.3g}sec")
             if verbose :
                 import pprint
                 C.logger.info(pprint.pformat(confData))
@@ -499,16 +504,16 @@ def _getSetting4GApps( verbose=False ) :
             return True
             
         elif ret == None :
-            C.logger.error(f"Update Error. {time.time() - start:.2f}sec")
+            C.logger.error(f"Update Error. {time.time() - start:.3g}sec")
             _sendACK2GAS( mess )
 
         else :
-            C.logger.warning(f"----- No update required {time.time() - start:.2f}sec")
+            C.logger.info(f"----- No update required {time.time() - start:.3g}sec")
             _sendACK2GAS( mess )
             return False
 
     else :
-        C.logger.error(f"Connection Error code:{res.status_code}  {time.time() - start:.2f}sec")
+        C.logger.error(f"Connection Error code:{res.status_code}  {time.time() - start:.3g}sec")
         _sendACK2GAS( mess )
         C.logger.debug(f"MESS{mess}")
 
@@ -582,7 +587,7 @@ def _checkBattery() :
         mess = ""
     
 def _intr_term( num, frame) :
-    C.logger.warning("SIGTERM catch exit...num}")
+    C.logger.warning(f"SIGTERM catch exit... {num}")
     sys.exit(0)
 
 ## MAIN
@@ -600,9 +605,9 @@ if __name__ == '__main__' :
         C.logger.info("->Update Config from Google Apps")
         start=time.time()
         if _getSetting4GApps(verbose=True) :
-            print(f"Update done. {time.time() - start:.2f}sec")
+            print(f"Update done. {time.time() - start:.3g}sec")
         else :
-            print(f"No need Update. {time.time() - start:.2f}sec")
+            print(f"No need Update. {time.time() - start:.3g}sec")
         sys.exit()     
 
     elif len(args) != 1 and args[1].upper() == "BATTERY" :
@@ -637,7 +642,7 @@ if __name__ == '__main__' :
     ### =========== スケジューラ登録
     ## 2分毎に秒にsend_cloud()を実行
     C.logger.info(f"[observer] _send_cloud() {C.SPAN_SEND_CLOUD} minutes.")
-    schedule.every(C.SPAN_SEND_CLOUD).minutes.do(_send_cloud)
+    schedule.every(C.SPAN_SEND_CLOUD).minutes.at(':00').do(_send_cloud)
 
     ## 1時間毎にGoogleから設定情報を取得して更新
     C.logger.info(f"[observer] _getSetting4GApps() {C.SPAN_CONFIG_UPDATE} hours.")
@@ -645,7 +650,7 @@ if __name__ == '__main__' :
 
     ## 毎日朝8時にバッテリー情報を通知
     C.logger.info(f"[observer] _checkBattery() 8:15 hours.")
-    schedule.every().day.at("08:00").do(_checkBattery)
+    schedule.every().day.at("08:15").do(_checkBattery)
 
     ## 実行し続ける ループ 
     while True:

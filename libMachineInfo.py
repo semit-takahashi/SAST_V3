@@ -99,6 +99,93 @@ def getVoltagePiSugar3() -> float :
     finally:
         bus.close()
         return level
+    
+def getWakeUpTime() : 
+    """ PiSugar3の起動時刻を取得
+    Returns:
+        str : Wakeup Timt String
+    """
+    tHH = -1
+    tMM = -1
+    tSS = -1
+    try :
+        bus = smbus2.SMBus(I2C_BUS)
+        boot = bus.read_byte_data(I2C_PiSugar_REG, 0x40)
+        if boot == 0x00 :
+            C.logger.warning("Disabled Timer ")
+            print(f"ob:{bin(boot)} ")
+
+        else :
+            tHH = hex2dec(bus.read_byte_data(I2C_PiSugar_REG, 0x45))
+            tMM = hex2dec(bus.read_byte_data(I2C_PiSugar_REG, 0x46))
+            tSS = hex2dec(bus.read_byte_data(I2C_PiSugar_REG, 0x47))
+            tHH = (tHH + 9 ) % 24
+            C.logger.warning(f"Enable Timer {tHH:02}:{tMM:02}:{tSS:02}")
+            #print(f"ob:{bin(boot)} ")
+
+    except Exception as e:
+        print(e)
+        C.logger.warning(f"No DATA from {I2C_PiSugar_REG} addr.")
+    
+    finally:
+        bus.close()
+        return (tHH,tMM,tSS)
+
+def setWakeUpTime( on : bool, hh=0, mm=0 ,ss=0 ) -> str :
+    """ PiSugar3の起動時刻を変更もしくは無効
+    Returns:
+        str : Wakeup Timt String
+    """
+    if not( 0<=hh<=23 ) : raise ValueError(f"Error Hour {hh}")
+    if not( 0<=mm<=60 ) : raise ValueError(f"Error Minute {mm}")
+    if not( 0<=mm<=60 ) : raise ValueError(f"Error Second {ss}")
+    try :
+        bus = smbus2.SMBus(I2C_BUS)
+        # PiSugar3の書き換えを可能に変更
+        wp = bus.read_byte_data(I2C_PiSugar_REG, 0x0b)
+        bus.write_byte_data(I2C_PiSugar_REG, 0x0b, 0x29)
+
+        if not on :
+            # タイマー無効
+            bus.write_byte_data(I2C_PiSugar_REG, 0x40, 0x00)
+            C.logger.warning(f"Disable Wake Up Time")
+        else :
+            # タイマー設定
+            bus.write_byte_data(I2C_PiSugar_REG, 0x40, 0x80)
+            bus.write_i2c_block_data(I2C_PiSugar_REG, 0x45, 
+                    [dec2hex( (hh-9)%24 ), dec2hex(mm),dec2hex(ss)])
+            C.logger.warning(f"Write TIME {hh:02}:{mm:02}:{ss:02}")
+
+        #PiSugar3の書き換えを不可に変更
+        bus.write_byte_data(I2C_PiSugar_REG, 0x00, wp)
+
+    except ValueError as e:
+        C.logger.warning(e)
+        return False
+
+    except Exception as e:
+        C.logger.warning(f"No DATA from {I2C_PiSugar_REG} addr.")
+        return False
+    
+    finally:
+        bus.close()
+        return True
+
+def dec2hex( decimal_number ) :
+    decimal_digits = [int(d) for d in str(decimal_number)] 
+    hex_digits = []
+    for digit in decimal_digits:
+        hex_digits.append(hex(digit)[2:].upper()) # 各桁を16進数に変換し、リストに格納
+    hex_string = "".join(hex_digits) # 16進数のリストを結合して文字列にする
+    return int("0x" + hex_string, 16) # 16進数の文字列を整数に変換
+
+
+def hex2dec( hex_number ):
+    hex_string = hex(hex_number)[2:].upper() # 16進数を文字列に変換 ("0xFF" -> "FF")
+    try :
+        return  int( hex_string )
+    except Exception as e:
+        return  -1
 
 def isRootUser() :
     """プロセス起動ユーザがroot?
@@ -320,8 +407,69 @@ def getCPU() :
     """
     return psutil.cpu_percent(interval=0.1)   
 
+def getBTdeviceList() :
+    """取得できるBluetoothのインタフェースリストを返す
+    """
+    interfaces = []
+    try:
+        # hciconfigコマンドを実行してBluetoothインターフェースの情報を取得
+        result = subprocess.run(['hciconfig'], capture_output=True, text=True, check=True)
+        output_lines = result.stdout.splitlines()
+
+        # 出力結果からインターフェース名を抽出
+        for line in output_lines:
+            if "hci" in line :
+                name = line.split(":")[0].strip()
+                bus = line.split(":")[3].strip()
+                id = int(name.replace('hci',''))
+                interfaces.append({'id':id,'name':name,'bus':bus})
+    except FileNotFoundError:
+        C.logger.error("Not Fine hciconfig Command ")
+        return None
+    except subprocess.CalledProcessError as e:
+        C.logger.error(f"hciconfig Error Found : {e}")
+
+    return interfaces
+
+def getBTdeviceID() :
+    """ 利用するBluetoothのInterfaceIDを返す"""
+    BTlist = getBTdeviceList()
+    for bt in BTlist :
+        if bt['bus'] == 'USB' :
+            C.logger.debug(f"Blutooh is USB {bt['name']}")
+            return bt['id']
+    return 0
+
+
 if __name__ == '__main__':
+    import sys
+    args = sys.argv
+    if len(args) != 1 and args[1].upper() == 'CLEAR_WAKEUP' :
+        print("Disable Wakeup")
+        setWakeUpTime( False )
+        sys.exit(1)
+
+    if len(args) != 1 and args[1].upper() == 'SET_WAKEUP' :
+        print("Enable Wakeup evary 7:0:0")
+        setWakeUpTime( True,7,0,0 )
+        sys.exit(1)
+
     print("libMachine.py TEST")
+
+#    print(f"PiSugar3 Wakeup Time:")
+#    getWakeUpTime()
+#    setWakeUpTime( True, 0,9,9 )
+#    getWakeUpTime()
+#    setWakeUpTime( True, 7,59,59 )
+#    getWakeUpTime()
+#    setWakeUpTime( True, 10,30,30 )
+#    getWakeUpTime()
+#    setWakeUpTime( False )
+#    getWakeUpTime()
+#    setWakeUpTime( True, 7,0,0 )
+#    getWakeUpTime()
+#    sys.exit(1)
+
     MyHOST = getHostname()
     print(f"HOST is {MyHOST}") 
     print(f"NODE No is {getNodeNo()}")
@@ -351,8 +499,11 @@ if __name__ == '__main__':
     print(f"PuSugar3 Power Connect? : {isChargePiSuger3()}")
     print(f"PiSugar3 Battery Level : {getBatteryPiSugar3()}")
     print(f"PiSugar3 Voltage Level : {getVoltagePiSugar3()}")
+    print(f"PiSugar3 Wakeup Time   : {getWakeUpTime()}")
     
     print(f"IsRoot : {isRootUser()}")
+    print(f"getBTdeviceList : {getBTdeviceList()}")
+    print(f"getBTdeviceID : {getBTdeviceID()}")
 
     print("libMachine debug done.")
     

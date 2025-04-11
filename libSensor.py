@@ -94,7 +94,7 @@ def getSensorsDATA_th1( maker:list ) -> list:
     start = time.time()
     ret = list()
 
-    scanner =  btle.Scanner()
+    scanner =  btle.Scanner(M.getBTdeviceID())
     devs = scanner.scan(C.SEARCH_SECOND)
     ## devsで取得されるのはScanEntryの配列
     ## see : http://ianharvey.github.io/bluepy-doc/scanentry.html
