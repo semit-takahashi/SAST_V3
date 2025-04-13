@@ -409,6 +409,8 @@ def getCPU() :
 
 def getBTdeviceList() :
     """取得できるBluetoothのインタフェースリストを返す
+      Returns:
+        list: Bluetoothインタフェース情報（dic)
     """
     interfaces = []
     try:
@@ -440,7 +442,7 @@ def getBTdeviceList() :
     return interfaces
 
 def getBTdeviceID() :
-    """ 利用するBluetoothのInterfaceIDを返す"""
+    """ USB BTがあればUPしてIDを返す なければ0（UART）を返す"""
     BTlist = getBTdeviceList()
     for bt in BTlist :
         if bt['bus'] == 'USB' :
@@ -448,17 +450,15 @@ def getBTdeviceID() :
             if bt['stat'] == "DOWN" :
                 try :
                     res = subprocess.run(['sudo', 'hciconfig', bt['name'], "up"], capture_output=True, text=True, check=True)
-                    stdout = res.stdout
-                    stderr = res.stderr
                     returncode = res.returncode
                     C.logger.info(f"hciconfig {bt['name']} UP ...  code={returncode}")
 
                 except subprocess.CalledProcessError as e:
-                    c.logger.error(f"Error executing hciconfig {interface_id} up : {e}")
+                    C.logger.error(f"Error executing hciconfig {bt['name']} up : {e}")
 
             return bt['id']
+    # Not Fount USB BT Interface
     return 0
-
 
 if __name__ == '__main__':
     import sys
@@ -475,6 +475,7 @@ if __name__ == '__main__':
 
     print("libMachine.py TEST")
 
+#   テストコード（getWakeUP with PuSugar3)
 #    print(f"PiSugar3 Wakeup Time:")
 #    getWakeUpTime()
 #    setWakeUpTime( True, 0,9,9 )
@@ -525,4 +526,3 @@ if __name__ == '__main__':
     print(f"getBTdeviceID : {getBTdeviceID()}")
 
     print("libMachine debug done.")
-    
