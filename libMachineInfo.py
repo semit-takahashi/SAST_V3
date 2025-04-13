@@ -417,12 +417,20 @@ def getBTdeviceList() :
         output_lines = result.stdout.splitlines()
 
         # 出力結果からインターフェース名を抽出
+        name = None
         for line in output_lines:
             if "hci" in line :
                 name = line.split(":")[0].strip()
                 bus = line.split(":")[3].strip()
                 id = int(name.replace('hci',''))
                 interfaces.append({'id':id,'name':name,'bus':bus})
+            elif "UP RUNNING" in line  and name != None :
+                for dic in interfaces :
+                    if "name" in dic and dic["name"] == name : dic["stat"]="UP"
+            elif "DOWN" in line  and name != None :
+                for dic in interfaces :
+                    if "name" in dic and dic["name"] == name : dic["stat"]="DOWN"
+
     except FileNotFoundError:
         C.logger.error("Not Fine hciconfig Command ")
         return None
@@ -436,7 +444,18 @@ def getBTdeviceID() :
     BTlist = getBTdeviceList()
     for bt in BTlist :
         if bt['bus'] == 'USB' :
-            C.logger.debug(f"Blutooh is USB {bt['name']}")
+            C.logger.debug(f"Blutooh is USB {bt['name']} / {bt['stat']}")
+            if bt['stat'] == "DOWN" :
+                try :
+                    res = subprocess.run(['sudo', 'hciconfig', bt['name'], "up"], capture_output=True, text=True, check=True)
+                    stdout = res.stdout
+                    stderr = res.stderr
+                    returncode = res.returncode
+                    C.logger.info(f"hciconfig {bt['name']} UP ...  code={returncode}")
+
+                except subprocess.CalledProcessError as e:
+                    c.logger.error(f"Error executing hciconfig {interface_id} up : {e}")
+
             return bt['id']
     return 0
 

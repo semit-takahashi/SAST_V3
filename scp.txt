@@ -1,1 +1,0 @@
-scp lib* SAST_[a-z]* config.py start.sh E220_* GAS_setting.py fumihito@lora2-01.local:/home/fumihito/SAST_V301

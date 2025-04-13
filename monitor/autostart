@@ -1,0 +1,11 @@
+@lxpanel --profile LXDE-pi
+@pcmanfm --desktop --profile LXDE-pi
+@xscreensaver -no-splash
+#
+# ---- Ambient kiosk
+@xset s off
+@xset -dpms
+@xset s noblank
+@unclutter
+
+/bin/bash /home/sast/SASTV301/monitor/launch.sh
