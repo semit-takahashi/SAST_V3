@@ -157,7 +157,7 @@ def setWakeUpTime( on : bool, hh=0, mm=0 ,ss=0 ) -> str :
             C.logger.warning(f"Write TIME {hh:02}:{mm:02}:{ss:02}")
 
         #PiSugar3の書き換えを不可に変更
-        bus.write_byte_data(I2C_PiSugar_REG, 0x00, wp)
+        bus.write_byte_data(I2C_PiSugar_REG, 0x0b, wp)
 
     except ValueError as e:
         C.logger.warning(e)
